@@ -1,0 +1,84 @@
+{
+  "name": "generic-lsp-proxy",
+  "displayName": "Generic LSP Proxy",
+  "description": "A flexible LSP proxy that dynamically forwards to any Language Server Protocol server",
+  "version": "0.1.0",
+  "publisher": "vscode-generic-lsp-proxy",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Programming Languages", "Other"],
+  "keywords": ["lsp", "language-server", "proxy", "generic"],
+  "activationEvents": [
+    "onStartupFinished",
+    "onLanguage:*",
+    "workspaceContains:**/.lsp-proxy.json",
+    "workspaceContains:**/.vscode/lsp-proxy.json"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Generic LSP Proxy",
+      "properties": {
+        "genericLspProxy.configPath": {
+          "type": "string",
+          "default": ".vscode/lsp-proxy.json",
+          "description": "Path to LSP server mappings configuration file"
+        },
+        "genericLspProxy.enableDebugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging for LSP communication"
+        },
+        "genericLspProxy.autoRestart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically restart crashed LSP servers"
+        },
+        "genericLspProxy.restartDelay": {
+          "type": "number",
+          "default": 1000,
+          "description": "Delay in milliseconds before restarting a crashed server"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "genericLspProxy.restart",
+        "title": "Restart LSP Server",
+        "category": "LSP Proxy"
+      },
+      {
+        "command": "genericLspProxy.showActiveServers",
+        "title": "Show Active LSP Servers",
+        "category": "LSP Proxy"
+      },
+      {
+        "command": "genericLspProxy.reloadConfig",
+        "title": "Reload LSP Configuration",
+        "category": "LSP Proxy"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "@types/node": "^20.11.0",
+    "@types/ws": "^8.5.10",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  }
+}

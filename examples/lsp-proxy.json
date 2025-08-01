@@ -1,0 +1,89 @@
+[
+  {
+    "languageId": "gdscript",
+    "command": "nc",
+    "args": ["localhost", "6005"],
+    "fileExtensions": [".gd", ".tres", ".tscn"],
+    "filePatterns": ["**/*.gd"],
+    "initializationOptions": {
+      "enable_semantic_highlighting": true
+    }
+  },
+  {
+    "languageId": "typescript",
+    "command": "typescript-language-server",
+    "args": ["--stdio"],
+    "fileExtensions": [".ts", ".tsx", ".mts", ".cts"],
+    "settings": {
+      "typescript": {
+        "inlayHints": {
+          "includeInlayParameterNameHints": "all",
+          "includeInlayParameterNameHintsWhenArgumentMatchesName": false,
+          "includeInlayFunctionParameterTypeHints": true,
+          "includeInlayVariableTypeHints": true
+        }
+      }
+    }
+  },
+  {
+    "languageId": "rust",
+    "command": "rust-analyzer",
+    "fileExtensions": [".rs"],
+    "initializationOptions": {
+      "cargo": {
+        "buildScripts": {
+          "enable": true
+        }
+      },
+      "procMacro": {
+        "enable": true
+      }
+    }
+  },
+  {
+    "languageId": "python",
+    "command": "pylsp",
+    "fileExtensions": [".py", ".pyw"],
+    "settings": {
+      "pylsp": {
+        "plugins": {
+          "pycodestyle": {
+            "enabled": true,
+            "maxLineLength": 120
+          }
+        }
+      }
+    }
+  },
+  {
+    "languageId": "go",
+    "command": "gopls",
+    "fileExtensions": [".go"],
+    "initializationOptions": {
+      "usePlaceholders": true,
+      "completeUnimported": true
+    }
+  },
+  {
+    "languageId": "java",
+    "command": "jdtls",
+    "fileExtensions": [".java"],
+    "workspacePattern": "**/src/main/java/**"
+  },
+  {
+    "languageId": "cpp",
+    "command": "clangd",
+    "args": ["--header-insertion=iwyu"],
+    "fileExtensions": [".cpp", ".cc", ".cxx", ".c++", ".h", ".hpp", ".hxx", ".h++", ".c", ".cu", ".m", ".mm"]
+  },
+  {
+    "languageId": "lua",
+    "command": "lua-language-server",
+    "fileExtensions": [".lua"],
+    "initializationOptions": {
+      "runtime": {
+        "version": "Lua 5.4"
+      }
+    }
+  }
+]

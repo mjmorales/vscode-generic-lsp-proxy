@@ -1,0 +1,31 @@
+[
+  {
+    "languageId": "gdscript",
+    "command": "nc",
+    "args": ["localhost", "6005"],
+    "transport": "tcp",
+    "tcpPort": 6005,
+    "fileExtensions": [".gd", ".tres", ".tscn"],
+    "initializationOptions": {
+      "enable_semantic_highlighting": true
+    }
+  },
+  {
+    "languageId": "custom-web-lsp",
+    "command": "node",
+    "args": ["/path/to/websocket-lsp-client.js"],
+    "transport": "websocket",
+    "websocketUrl": "ws://localhost:8080/lsp",
+    "fileExtensions": [".custom"],
+    "filePatterns": ["**/*.custom"]
+  },
+  {
+    "languageId": "remote-python",
+    "command": "ssh",
+    "args": ["remote-server", "python", "-m", "pylsp"],
+    "fileExtensions": [".py"],
+    "env": {
+      "SSH_AUTH_SOCK": "/tmp/ssh-agent.sock"
+    }
+  }
+]
