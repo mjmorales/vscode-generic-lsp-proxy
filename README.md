@@ -3,6 +3,8 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/vscode-generic-lsp-proxy.generic-lsp-proxy)](https://marketplace.visualstudio.com/items?itemName=vscode-generic-lsp-proxy.generic-lsp-proxy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/mjmorales/vscode-generic-lsp-proxy/workflows/CI/badge.svg)](https://github.com/mjmorales/vscode-generic-lsp-proxy/actions)
+[![Release](https://github.com/mjmorales/vscode-generic-lsp-proxy/workflows/Release/badge.svg)](https://github.com/mjmorales/vscode-generic-lsp-proxy/releases)
+[![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
 
 A flexible Language Server Protocol (LSP) proxy extension for VS Code that dynamically forwards requests to any LSP server based on configuration files. No more installing separate extensions for each language!
 
