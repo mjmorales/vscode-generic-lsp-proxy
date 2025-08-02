@@ -5,14 +5,14 @@ import * as fs from 'fs';
 
 suite('Extension Test Suite', () => {
     suiteSetup(async () => {
-        const ext = vscode.extensions.getExtension('vscode-generic-lsp-proxy.generic-lsp-proxy');
+        const ext = vscode.extensions.getExtension('mjmorales.generic-lsp-proxy');
         if (ext && !ext.isActive) {
             await ext.activate();
         }
     });
 
     test('Extension should be present', () => {
-        assert.ok(vscode.extensions.getExtension('vscode-generic-lsp-proxy.generic-lsp-proxy'));
+        assert.ok(vscode.extensions.getExtension('mjmorales.generic-lsp-proxy'));
     });
 
     test('Should register all expected commands', async () => {
@@ -33,7 +33,7 @@ suite('Extension Test Suite', () => {
     });
 
     test('Should have correct activation events', () => {
-        const extension = vscode.extensions.getExtension('vscode-generic-lsp-proxy.generic-lsp-proxy');
+        const extension = vscode.extensions.getExtension('mjmorales.generic-lsp-proxy');
         assert.ok(extension);
         
         const packageJSON = extension.packageJSON;
@@ -43,7 +43,7 @@ suite('Extension Test Suite', () => {
     });
 
     test('Should contribute configuration properties', () => {
-        const extension = vscode.extensions.getExtension('vscode-generic-lsp-proxy.generic-lsp-proxy');
+        const extension = vscode.extensions.getExtension('mjmorales.generic-lsp-proxy');
         assert.ok(extension);
         
         const contributions = extension.packageJSON.contributes;
