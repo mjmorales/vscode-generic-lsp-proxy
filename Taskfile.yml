@@ -308,3 +308,8 @@ tasks:
       - task: fix
       - task: check
       - echo "✅ Project is ready for commit!"
+
+  pr:
+    desc: Create a PR using Claude
+    cmds:
+      - claude -p "/pr"
