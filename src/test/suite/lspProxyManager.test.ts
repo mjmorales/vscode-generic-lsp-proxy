@@ -85,8 +85,7 @@ suite('LspProxyManager Test Suite', () => {
             client: mockLanguageClient,
             config,
             status: 'running',
-            documentCount: 1,
-            restartCount: 0
+            documentCount: 1
         });
 
         const startClientStub = sandbox.stub(lspManager as any, 'startClient');
@@ -107,8 +106,7 @@ suite('LspProxyManager Test Suite', () => {
             client: mockLanguageClient,
             config,
             status: 'running',
-            documentCount: 0,
-            restartCount: 0
+            documentCount: 0
         });
 
         const mockDocument = {
@@ -135,8 +133,7 @@ suite('LspProxyManager Test Suite', () => {
             client: mockLanguageClient,
             config,
             status: 'running',
-            documentCount: 1,
-            restartCount: 0
+            documentCount: 1
         });
 
         const stopClientStub = sandbox.stub(lspManager, 'stopClient').resolves();
@@ -159,8 +156,7 @@ suite('LspProxyManager Test Suite', () => {
             client: mockLanguageClient,
             config,
             status: 'running',
-            documentCount: 2,
-            restartCount: 0
+            documentCount: 2
         });
 
         (lspManager as any).documentTracking.set('go', new Set(['/file1.go', '/file2.go']));
@@ -183,8 +179,7 @@ suite('LspProxyManager Test Suite', () => {
                 client: mockLanguageClient,
                 config,
                 status: 'running',
-                documentCount: 1,
-                restartCount: 0
+                documentCount: 1
             });
         });
 
@@ -208,8 +203,7 @@ suite('LspProxyManager Test Suite', () => {
                 client: mockLanguageClient,
                 config: { ...config, fileExtensions: ['.ext'] },
                 status: 'running',
-                documentCount: index + 1,
-                restartCount: 0
+                documentCount: index + 1
             });
         });
 
@@ -233,22 +227,17 @@ suite('LspProxyManager Test Suite', () => {
             client: mockLanguageClient,
             config,
             status: 'starting' as const,
-            documentCount: 0,
-            restartCount: 1
+            documentCount: 0
         };
 
         (lspManager as any).clients.set('java', clientInfo);
-
-        const cancelRestartStub = sandbox.stub(lspManager as any, 'cancelRestart');
         
         (lspManager as any).handleClientStateChange('java', { oldState: 1, newState: 2 });
         
         assert.strictEqual(clientInfo.status, 'running');
-        assert.strictEqual(clientInfo.restartCount, 0);
-        assert(cancelRestartStub.calledWith('java'));
     });
 
-    test('should schedule restart on client failure', () => {
+    test('should handle client state changes to stopped', () => {
         const config: LSPServerConfig = {
             languageId: 'rust',
             command: 'rust-analyzer',
@@ -259,44 +248,16 @@ suite('LspProxyManager Test Suite', () => {
             client: mockLanguageClient,
             config,
             status: 'running' as const,
-            documentCount: 1,
-            restartCount: 0
+            documentCount: 1
         };
 
         (lspManager as any).clients.set('rust', clientInfo);
-
-        const scheduleRestartStub = sandbox.stub(lspManager as any, 'scheduleRestart');
         
         (lspManager as any).handleClientStateChange('rust', { oldState: 2, newState: 3 });
         
         assert.strictEqual(clientInfo.status, 'stopped');
-        assert(scheduleRestartStub.calledWith('rust'));
     });
 
-    test('should limit restart attempts', () => {
-        const config: LSPServerConfig = {
-            languageId: 'cpp',
-            command: 'clangd',
-            fileExtensions: ['.cpp']
-        };
-
-        const clientInfo = {
-            client: mockLanguageClient,
-            config,
-            status: 'error' as const,
-            documentCount: 0,
-            restartCount: 3
-        };
-
-        (lspManager as any).clients.set('cpp', clientInfo);
-
-        const setTimeoutStub = sandbox.stub(global, 'setTimeout');
-        
-        (lspManager as any).scheduleRestart('cpp');
-        
-        assert(setTimeoutStub.notCalled);
-        assert(mockLogger.error.calledWith('Max restart attempts reached for cpp'));
-    });
 
     test('should create server options for stdio transport', () => {
         const config: LSPServerConfig = {
@@ -341,8 +302,7 @@ suite('LspProxyManager Test Suite', () => {
             client: mockLanguageClient,
             config,
             status: 'running',
-            documentCount: 0,
-            restartCount: 0
+            documentCount: 0
         });
 
         (lspManager as any).handleClientStateChange('lua', { oldState: 1, newState: 2 });

@@ -7,8 +7,16 @@
   "engines": {
     "vscode": "^1.75.0"
   },
-  "categories": ["Programming Languages", "Other"],
-  "keywords": ["lsp", "language-server", "proxy", "generic"],
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "lsp",
+    "language-server",
+    "proxy",
+    "generic"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/mjmorales/vscode-generic-lsp-proxy.git"
