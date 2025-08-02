@@ -17,3 +17,5 @@ coverage/**
 .github/**
 *.vsix
 package-lock.json
+.releaserc.json
+CHANGELOG.md
