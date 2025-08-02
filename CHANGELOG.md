@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v1.0.0...v1.0.1) (2025-08-02)
+
+
+### Bug Fixes
+
+* update activation events and release configuration ([5156734](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/51567347438040d01d5f98d14fa2669c6badf4a5))
+
 # 1.0.0 (2025-08-02)
 
 
