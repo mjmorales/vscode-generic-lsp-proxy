@@ -11,7 +11,6 @@ src/**
 **/tsconfig.json
 **/Taskfile.yml
 **/test/**
-node_modules/**
 examples/**
 coverage/**
 .github/**
