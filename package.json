@@ -9,6 +9,14 @@
   },
   "categories": ["Programming Languages", "Other"],
   "keywords": ["lsp", "language-server", "proxy", "generic"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mjmorales/vscode-generic-lsp-proxy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mjmorales/vscode-generic-lsp-proxy/issues"
+  },
+  "homepage": "https://github.com/mjmorales/vscode-generic-lsp-proxy#readme",
   "activationEvents": [
     "onStartupFinished",
     "onLanguage:*",
@@ -69,7 +77,9 @@
     "test": "node ./out/test/runTest.js",
     "test:unit": "node ./out/test/unit-test-runner.js",
     "test:compile": "npm run compile && npm run test",
-    "pretest": "npm run compile && npm run lint"
+    "pretest": "npm run compile && npm run lint",
+    "semantic-release": "semantic-release",
+    "semantic-release:dry": "semantic-release --dry-run"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1",
@@ -91,6 +101,10 @@
     "glob": "^10.3.10",
     "prettier": "^3.2.4",
     "nyc": "^15.1.0",
-    "typedoc": "^0.25.7"
+    "typedoc": "^0.25.7",
+    "semantic-release": "^23.0.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "semantic-release-vsce": "^5.6.4"
   }
 }
