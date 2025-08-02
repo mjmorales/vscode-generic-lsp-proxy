@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v1.0.1...v1.0.2) (2025-08-02)
+
+
+### Bug Fixes
+
+* package node_modules in release ([b17433a](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/b17433ac2b780f3ecdbe5bde144bb1f0d3a5e3fc))
+
 ## [1.0.1](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v1.0.0...v1.0.1) (2025-08-02)
 
 
