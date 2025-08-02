@@ -1,0 +1,29 @@
+[
+  {
+    "languageId": "test-typescript",
+    "command": "mock-typescript-server",
+    "args": ["--stdio"],
+    "fileExtensions": [".ts", ".tsx"],
+    "initializationOptions": {
+      "preferences": {
+        "includeCompletionsForModuleExports": true
+      }
+    }
+  },
+  {
+    "languageId": "test-python",
+    "command": "mock-python-server",
+    "fileExtensions": [".py"],
+    "settings": {
+      "python.analysis.autoImportCompletions": true
+    }
+  },
+  {
+    "languageId": "test-tcp",
+    "command": "nc",
+    "args": ["localhost", "9999"],
+    "transport": "tcp",
+    "tcpPort": 9999,
+    "fileExtensions": [".tcp"]
+  }
+]

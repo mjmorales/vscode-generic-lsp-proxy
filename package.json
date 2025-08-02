@@ -30,16 +30,6 @@
           "type": "boolean",
           "default": false,
           "description": "Enable debug logging for LSP communication"
-        },
-        "genericLspProxy.autoRestart": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically restart crashed LSP servers"
-        },
-        "genericLspProxy.restartDelay": {
-          "type": "number",
-          "default": 1000,
-          "description": "Delay in milliseconds before restarting a crashed server"
         }
       }
     },
@@ -58,6 +48,16 @@
         "command": "genericLspProxy.reloadConfig",
         "title": "Reload LSP Configuration",
         "category": "LSP Proxy"
+      },
+      {
+        "command": "genericLspProxy.init",
+        "title": "Initialize LSP Configuration",
+        "category": "LSP Proxy"
+      },
+      {
+        "command": "genericLspProxy.showDisabledServers",
+        "title": "Show Disabled Servers",
+        "category": "LSP Proxy"
       }
     ]
   },
@@ -66,7 +66,10 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "test:unit": "node ./out/test/unit-test-runner.js",
+    "test:compile": "npm run compile && npm run test",
+    "pretest": "npm run compile && npm run lint"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1",
@@ -79,6 +82,15 @@
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
     "eslint": "^8.56.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@types/mocha": "^10.0.6",
+    "@types/sinon": "^17.0.3",
+    "@vscode/test-electron": "^2.3.9",
+    "mocha": "^10.2.0",
+    "sinon": "^17.0.1",
+    "glob": "^10.3.10",
+    "prettier": "^3.2.4",
+    "nyc": "^15.1.0",
+    "typedoc": "^0.25.7"
   }
 }

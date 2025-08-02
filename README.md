@@ -1,170 +1,381 @@
 # Generic LSP Proxy for VS Code
 
-A flexible Language Server Protocol (LSP) proxy extension that dynamically forwards requests to any LSP server based on configuration files. This allows you to use multiple language servers without installing separate extensions for each language.
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/vscode-generic-lsp-proxy.generic-lsp-proxy)](https://marketplace.visualstudio.com/items?itemName=vscode-generic-lsp-proxy.generic-lsp-proxy)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/mjmorales/vscode-generic-lsp-proxy/workflows/CI/badge.svg)](https://github.com/mjmorales/vscode-generic-lsp-proxy/actions)
 
-## Features
+A flexible Language Server Protocol (LSP) proxy extension for VS Code that dynamically forwards requests to any LSP server based on configuration files. No more installing separate extensions for each language!
 
-- 🔄 Dynamic LSP server loading based on file type
-- 📝 Configuration-driven approach using JSON files
-- 🚀 Support for stdio, TCP, and WebSocket transports
-- 🔧 Auto-restart capability for crashed servers
-- 📊 Status bar integration showing active servers
-- 🎯 Per-workspace and global configuration support
-- 🛠️ Built-in commands for server management
+## 🌟 Features
 
-## Installation
+- 🔄 **Dynamic LSP Loading** - Automatically detect and load language servers based on file type
+- 📝 **Configuration-Driven** - Simple JSON configuration for any LSP server
+- 🚀 **Multiple Transport Support** - stdio, TCP, and WebSocket connections
+- 📊 **Status Bar Integration** - Monitor active servers at a glance
+- 🎯 **Per-Workspace Configuration** - Different settings for different projects
+- 🛠️ **Built-in Commands** - Restart, reload, and manage servers easily
+- 🛡️ **Manual Server Management** - Enable/disable servers as needed
 
-1. Clone this repository
-2. Run `npm install` to install dependencies
-3. Run `npm run compile` to build the extension
-4. Open VS Code and run the extension in debug mode (F5)
+## 📦 Installation
 
-## Configuration
+### From VS Code Marketplace
 
-The extension looks for configuration in the following locations (in order of priority):
+1. Open VS Code
+2. Press `Ctrl+P` / `Cmd+P`
+3. Type `ext install generic-lsp-proxy`
+4. Press Enter
 
-1. `.vscode/lsp-proxy.json` in your workspace
-2. `.lsp-proxy.json` in your workspace root
-3. Global configuration in VS Code's storage
+### From Source
 
-### Configuration File Format
+```bash
+# Clone the repository
+git clone https://github.com/mjmorales/vscode-generic-lsp-proxy.git
+cd vscode-generic-lsp-proxy
 
-Create a `.vscode/lsp-proxy.json` file in your workspace:
+# Install dependencies
+npm install
 
-```json
-[
-  {
-    "languageId": "typescript",
-    "command": "typescript-language-server",
-    "args": ["--stdio"],
-    "fileExtensions": [".ts", ".tsx"],
-    "initializationOptions": {},
-    "settings": {}
-  }
-]
+# Build and package
+npm run compile
+npx vsce package
+
+# Install the VSIX
+code --install-extension generic-lsp-proxy-*.vsix
 ```
 
-### Configuration Options
+## 🚀 Quick Start
 
-Each LSP server configuration supports the following options:
+### 1. Initialize Configuration
 
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `languageId` | string | ✓ | Unique identifier for the language |
-| `command` | string | ✓ | Command to start the LSP server |
-| `args` | string[] | | Arguments to pass to the command |
-| `fileExtensions` | string[] | ✓ | File extensions to activate this server for |
-| `filePatterns` | string[] | | Glob patterns for more complex file matching |
-| `workspacePattern` | string | | Restrict this config to specific workspace folders |
-| `initializationOptions` | object | | LSP initialization options |
-| `settings` | object | | Language-specific settings |
-| `env` | object | | Environment variables for the server process |
-| `transport` | string | | Transport type: "stdio" (default), "tcp", or "websocket" |
-| `tcpPort` | number | | Port for TCP transport |
-| `websocketUrl` | string | | URL for WebSocket transport |
+#### Option A: Use the Init Command (Recommended)
 
-## Examples
+1. Press `Ctrl+Shift+P` / `Cmd+Shift+P`
+2. Run `LSP Proxy: Initialize LSP Configuration`
+3. Choose `Custom Configuration`:
+   - Enter language ID (e.g., `python`, `rust`, `custom`)
+   - Enter LSP command (e.g., `pylsp`, `rust-analyzer`)
+   - Enter file extensions (e.g., `.py, .pyw`)
+   - Select transport type (stdio, tcp, or websocket)
+   - Add optional arguments if needed
+4. Your `.vscode/lsp-proxy.json` will be created automatically!
 
-### Basic Configuration
+#### Option B: Create Manually
 
 ```json
 [
   {
     "languageId": "python",
     "command": "pylsp",
-    "fileExtensions": [".py"],
-    "settings": {
-      "pylsp": {
-        "plugins": {
-          "pycodestyle": {
-            "enabled": true,
-            "maxLineLength": 120
-          }
-        }
-      }
-    }
-  }
-]
-```
-
-### TCP Connection (e.g., Godot)
-
-```json
-[
-  {
-    "languageId": "gdscript",
-    "command": "nc",
-    "args": ["localhost", "6005"],
-    "transport": "tcp",
-    "tcpPort": 6005,
-    "fileExtensions": [".gd", ".tres", ".tscn"]
-  }
-]
-```
-
-### Remote Server via SSH
-
-```json
-[
-  {
-    "languageId": "remote-python",
-    "command": "ssh",
-    "args": ["remote-server", "python", "-m", "pylsp"],
     "fileExtensions": [".py"]
   }
 ]
 ```
 
-## Commands
+### 2. Install Language Server
 
-The extension provides the following commands:
+```bash
+# Python
+pip install python-lsp-server
 
+# TypeScript
+npm install -g typescript-language-server typescript
+
+# Rust
+rustup component add rust-analyzer
+```
+
+### 3. Open a File
+
+Open any file matching your configured extensions. The LSP will start automatically!
+
+## 📋 Configuration
+
+### Configuration File Locations
+
+The extension looks for configuration in the following order:
+
+1. `.vscode/lsp-proxy.json` (workspace-specific)
+2. `.lsp-proxy.json` (project root)
+3. Global configuration in VS Code settings
+
+### Configuration Schema
+
+```typescript
+interface LSPServerConfig {
+  // Required fields
+  languageId: string;          // Unique identifier for the language
+  command: string;             // Command to start the LSP server
+  fileExtensions: string[];    // File extensions to activate this server
+  
+  // Optional fields
+  args?: string[];             // Command line arguments
+  filePatterns?: string[];     // Glob patterns for file matching
+  workspacePattern?: string;   // Restrict to specific workspace folders
+  initializationOptions?: {};  // LSP initialization options
+  settings?: {};               // Language-specific settings
+  env?: {};                    // Environment variables
+  transport?: 'stdio' | 'tcp' | 'websocket';  // Connection type
+  tcpPort?: number;            // Port for TCP transport
+  websocketUrl?: string;       // URL for WebSocket transport
+}
+```
+
+### Example Configurations
+
+<details>
+<summary><strong>TypeScript/JavaScript</strong></summary>
+
+```json
+{
+  "languageId": "typescript",
+  "command": "typescript-language-server",
+  "args": ["--stdio"],
+  "fileExtensions": [".ts", ".tsx", ".js", ".jsx"],
+  "initializationOptions": {
+    "preferences": {
+      "includeCompletionsForModuleExports": true,
+      "includeInlayParameterNameHints": "all"
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>Python</strong></summary>
+
+```json
+{
+  "languageId": "python",
+  "command": "pylsp",
+  "fileExtensions": [".py", ".pyw"],
+  "settings": {
+    "pylsp": {
+      "plugins": {
+        "pycodestyle": {
+          "enabled": true,
+          "maxLineLength": 120
+        },
+        "pylint": {
+          "enabled": true
+        }
+      }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>Rust</strong></summary>
+
+```json
+{
+  "languageId": "rust",
+  "command": "rust-analyzer",
+  "fileExtensions": [".rs"],
+  "initializationOptions": {
+    "cargo": {
+      "buildScripts": {
+        "enable": true
+      },
+      "features": "all"
+    },
+    "procMacro": {
+      "enable": true
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>Go</strong></summary>
+
+```json
+{
+  "languageId": "go",
+  "command": "gopls",
+  "fileExtensions": [".go"],
+  "initializationOptions": {
+    "usePlaceholders": true,
+    "completeUnimported": true,
+    "staticcheck": true
+  }
+}
+```
+</details>
+
+<details>
+<summary><strong>Remote Server (TCP)</strong></summary>
+
+```json
+{
+  "languageId": "gdscript",
+  "command": "nc",
+  "args": ["localhost", "6005"],
+  "transport": "tcp",
+  "tcpPort": 6005,
+  "fileExtensions": [".gd", ".tres", ".tscn"]
+}
+```
+</details>
+
+## ⚙️ Extension Settings
+
+Configure the extension behavior in VS Code settings (`Ctrl+,` / `Cmd+,`):
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `genericLspProxy.configPath` | string | `.vscode/lsp-proxy.json` | Path to configuration file |
+| `genericLspProxy.enableDebugLogging` | boolean | `false` | Enable detailed logging |
+
+## 📟 Commands
+
+Access commands via Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
+
+- **LSP Proxy: Initialize LSP Configuration** - Create a new LSP configuration with guided setup
 - **LSP Proxy: Restart LSP Server** - Restart the server for the current file
-- **LSP Proxy: Show Active LSP Servers** - Display all running servers with management options
-- **LSP Proxy: Reload LSP Configuration** - Reload configuration files and restart servers
+- **LSP Proxy: Show Active LSP Servers** - Display and manage running servers
+- **LSP Proxy: Reload LSP Configuration** - Reload config and restart servers
+- **LSP Proxy: Show Disabled Servers** - View and re-enable servers that failed to start
 
-## Extension Settings
+## 🔧 Development
 
-Configure the extension behavior in VS Code settings:
+This project uses [Task](https://taskfile.dev/) for development workflows.
 
-- `genericLspProxy.configPath`: Path to the configuration file (default: `.vscode/lsp-proxy.json`)
-- `genericLspProxy.enableDebugLogging`: Enable detailed logging for debugging
-- `genericLspProxy.autoRestart`: Automatically restart crashed servers (default: true)
-- `genericLspProxy.restartDelay`: Delay in milliseconds before restarting (default: 1000)
+### Prerequisites
 
-## Status Bar
+```bash
+# Install Task
+brew install go-task/tap/go-task  # macOS
+# or see https://taskfile.dev/installation/
 
-The extension adds a status bar item showing the number of active LSP servers. Click on it to manage running servers.
+# Install dependencies
+task install
+```
 
-## Troubleshooting
+### Common Tasks
 
-1. **Server not starting**: Check the Output panel (View → Output → Generic LSP Proxy) for error messages
-2. **No completions**: Ensure the language server is installed and accessible in your PATH
-3. **Wrong server activated**: Check file extensions and patterns in your configuration
+```bash
+task          # Show all available tasks
+task dev      # Start development mode
+task test     # Run all tests
+task lint     # Run linter
+task build    # Build the extension
+task package  # Create VSIX file
+```
 
-## Supported Language Servers
+### Project Structure
 
-The extension can work with any LSP-compliant server. Some popular examples:
+```
+vscode-generic-lsp-proxy/
+├── src/
+│   ├── extension.ts          # Extension entry point
+│   ├── lspProxyManager.ts    # LSP client lifecycle management
+│   ├── configurationManager.ts # Configuration loading and validation
+│   ├── logger.ts             # Logging utilities
+│   └── test/                 # Test suites
+├── examples/                 # Example configurations
+├── package.json             # Extension manifest
+├── Taskfile.yml            # Task runner configuration
+└── README.md               # This file
+```
 
-- TypeScript: `typescript-language-server`
-- Python: `pylsp`, `pyright`
-- Rust: `rust-analyzer`
-- Go: `gopls`
-- C/C++: `clangd`
-- Java: `jdtls`
-- Lua: `lua-language-server`
+### Testing
 
-## Development
+```bash
+# Run all tests
+task test
 
-To contribute or modify the extension:
+# Run with coverage
+task test:coverage
 
-1. Clone the repository
-2. Run `npm install`
-3. Make your changes
-4. Run `npm run lint` to check code style
-5. Run `npm run compile` to build
-6. Test in VS Code using F5 (Run Extension)
+# Run specific test suite
+npm test -- --grep "ConfigurationManager"
+```
 
-## License
+### Code Quality
 
-MIT
+```bash
+# Run all checks
+task check
+
+# Auto-fix issues
+task fix
+
+# Format code
+task format
+```
+
+## 🐛 Troubleshooting
+
+### Server Not Starting
+
+1. **Check Output Panel**: View → Output → "Generic LSP Proxy"
+2. **Verify Installation**: `which <command>` should return the path
+3. **Test Manually**: Run `<command> --version` in terminal
+4. **Check Configuration**: Ensure JSON is valid and paths are correct
+
+### No IntelliSense/Completions
+
+1. **File Extension**: Verify file extension matches configuration
+2. **Language Server Features**: Not all servers support all features
+3. **Initialization**: Check `initializationOptions` in config
+4. **Debug Logging**: Enable in settings to see LSP communication
+
+### Performance Issues
+
+1. **Reduce File Watchers**: Limit `filePatterns` scope
+2. **Server Performance**: Some servers are resource-intensive
+3. **Check Output**: Look for errors in the output panel
+
+### Common Error Messages
+
+| Error | Solution |
+|-------|----------|
+| "Command not found" | Install the language server or check PATH |
+| "Connection refused" | For TCP, ensure server is running on specified port |
+| "Invalid configuration" | Check JSON syntax and required fields |
+| "Server stopped" | Check server logs and restart manually |
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and add tests
+4. Run checks: `task ready`
+5. Commit: `git commit -m 'Add amazing feature'`
+6. Push: `git push origin feature/amazing-feature`
+7. Open a Pull Request
+
+### Development Guidelines
+
+- Write tests for new features
+- Follow existing code style
+- Update documentation
+- Add example configurations
+- Run `task check` before committing
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [vscode-languageclient](https://github.com/Microsoft/vscode-languageserver-node)
+- Inspired by the need for a unified LSP experience
+- Thanks to all contributors and users
+
+## 🔗 Links
+
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=vscode-generic-lsp-proxy.generic-lsp-proxy)
+- [GitHub Repository](https://github.com/mjmorales/vscode-generic-lsp-proxy)
+- [Issue Tracker](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues)
+- [Language Server Protocol Specification](https://microsoft.github.io/language-server-protocol/)
+
+---
+
+Made with ❤️ for the VS Code community

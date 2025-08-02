@@ -1,0 +1,20 @@
+{
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    },
+    "eslint.enable": true,
+    "eslint.validate": [
+        "typescript"
+    ],
+    "files.exclude": {
+        "out": true,
+        "node_modules": true,
+        "**/.DS_Store": true
+    },
+    "search.exclude": {
+        "out": true,
+        "node_modules": true
+    }
+}

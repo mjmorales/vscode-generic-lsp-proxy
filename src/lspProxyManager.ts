@@ -16,14 +16,12 @@ interface ClientInfo {
     config: LSPServerConfig;
     status: 'starting' | 'running' | 'stopped' | 'error';
     documentCount: number;
-    restartCount: number;
     lastError?: string;
 }
 
 export class LspProxyManager extends EventEmitter {
     private clients: Map<string, ClientInfo> = new Map();
     private documentTracking: Map<string, Set<string>> = new Map();
-    private restartTimers: Map<string, NodeJS.Timeout> = new Map();
 
     constructor(
         private configManager: ConfigurationManager,
@@ -52,6 +50,10 @@ export class LspProxyManager extends EventEmitter {
         try {
             this.logger.info(`Starting LSP client for ${config.languageId}`);
             
+            // Get existing info BEFORE creating new client
+            const existingInfo = this.clients.get(config.languageId);
+            const preservedDocumentCount = existingInfo?.documentCount || 0;
+            
             const serverOptions = this.createServerOptions(config);
             const clientOptions = this.createClientOptions(config);
             
@@ -66,8 +68,7 @@ export class LspProxyManager extends EventEmitter {
                 client,
                 config,
                 status: 'starting',
-                documentCount: 0,
-                restartCount: 0
+                documentCount: preservedDocumentCount
             };
 
             this.clients.set(config.languageId, clientInfo);
@@ -92,7 +93,7 @@ export class LspProxyManager extends EventEmitter {
             if (clientInfo) {
                 clientInfo.status = 'error';
                 clientInfo.lastError = error instanceof Error ? error.message : String(error);
-                this.scheduleRestart(config.languageId);
+                // State change handler will schedule restart when client transitions to stopped
             }
         }
     }
@@ -101,9 +102,10 @@ export class LspProxyManager extends EventEmitter {
         const env = config.env ? { ...process.env, ...config.env } : process.env;
 
         if (config.transport === 'tcp' && config.tcpPort) {
+            const tcpPort = config.tcpPort;
             return () => {
                 return new Promise<StreamInfo>((resolve, reject) => {
-                    const socket = net.connect(config.tcpPort!);
+                    const socket = net.connect(tcpPort);
                     socket.on('connect', () => {
                         resolve({ writer: socket, reader: socket });
                     });
@@ -146,6 +148,7 @@ export class LspProxyManager extends EventEmitter {
                 fileEvents: vscode.workspace.createFileSystemWatcher('**/*')
             },
             initializationOptions: config.initializationOptions,
+            outputChannel: this.logger.getOutputChannel(),
             middleware: {
                 provideCompletionItem: async (document, position, context, token, next) => {
                     this.logger.debug(`Completion requested for ${document.uri.toString()}`);
@@ -168,71 +171,40 @@ export class LspProxyManager extends EventEmitter {
         return clientOptions;
     }
 
-    private handleClientStateChange(languageId: string, event: any): void {
+    private handleClientStateChange(languageId: string, event: { oldState: number; newState: number }): void {
         const clientInfo = this.clients.get(languageId);
-        if (!clientInfo) return;
+        if (!clientInfo) {
+            this.logger.warn(`No client info found for ${languageId} during state change`);
+            return;
+        }
 
         this.logger.debug(`Client ${languageId} state changed: ${event.oldState} -> ${event.newState}`);
 
         if (event.newState === 2) {
             clientInfo.status = 'running';
-            clientInfo.restartCount = 0;
-            this.cancelRestart(languageId);
         } else if (event.newState === 1) {
             clientInfo.status = 'starting';
         } else if (event.newState === 3) {
             clientInfo.status = 'stopped';
-            this.scheduleRestart(languageId);
         }
 
         this.emit('serversChanged');
     }
 
     private trackDocument(languageId: string, documentUri: string): void {
-        if (!this.documentTracking.has(languageId)) {
-            this.documentTracking.set(languageId, new Set());
+        let documentSet = this.documentTracking.get(languageId);
+        if (!documentSet) {
+            documentSet = new Set();
+            this.documentTracking.set(languageId, documentSet);
         }
-        this.documentTracking.get(languageId)!.add(documentUri);
+        documentSet.add(documentUri);
         
         const clientInfo = this.clients.get(languageId);
         if (clientInfo) {
-            clientInfo.documentCount = this.documentTracking.get(languageId)!.size;
+            clientInfo.documentCount = documentSet.size;
         }
     }
 
-    private scheduleRestart(languageId: string): void {
-        const autoRestart = vscode.workspace.getConfiguration('genericLspProxy').get<boolean>('autoRestart', true);
-        if (!autoRestart) return;
-
-        const clientInfo = this.clients.get(languageId);
-        if (!clientInfo || clientInfo.restartCount >= 3) {
-            this.logger.error(`Max restart attempts reached for ${languageId}`);
-            return;
-        }
-
-        const delay = vscode.workspace.getConfiguration('genericLspProxy').get<number>('restartDelay', 1000);
-        
-        this.cancelRestart(languageId);
-        
-        const timer = setTimeout(async () => {
-            const info = this.clients.get(languageId);
-            if (info) {
-                info.restartCount++;
-                await this.startClient(info.config);
-            }
-        }, delay);
-
-        this.restartTimers.set(languageId, timer);
-        this.logger.info(`Scheduled restart for ${languageId} in ${delay}ms`);
-    }
-
-    private cancelRestart(languageId: string): void {
-        const timer = this.restartTimers.get(languageId);
-        if (timer) {
-            clearTimeout(timer);
-            this.restartTimers.delete(languageId);
-        }
-    }
 
     async restartClient(languageId: string): Promise<void> {
         await this.stopClient(languageId);
@@ -245,8 +217,6 @@ export class LspProxyManager extends EventEmitter {
     async stopClient(languageId: string): Promise<void> {
         const clientInfo = this.clients.get(languageId);
         if (!clientInfo) return;
-
-        this.cancelRestart(languageId);
         
         try {
             if (clientInfo.client.needsStop()) {
@@ -256,6 +226,7 @@ export class LspProxyManager extends EventEmitter {
             this.logger.error(`Error stopping client ${languageId}: ${error}`);
         }
 
+        this.logger.debug(`Removing client ${languageId} from tracking`);
         this.clients.delete(languageId);
         this.documentTracking.delete(languageId);
         this.emit('serversChanged');

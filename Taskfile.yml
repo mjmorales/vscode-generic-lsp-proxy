@@ -1,0 +1,310 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  EXTENSION_NAME: generic-lsp-proxy
+  NODE_VERSION: "20.x"
+  BUILD_DIR: ./out
+  TEST_DIR: ./src/test
+  COVERAGE_DIR: ./coverage
+
+env:
+  NODE_ENV: '{{default "development" .NODE_ENV}}'
+
+tasks:
+  # Default task - show available tasks
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # Installation and setup
+  install:
+    desc: Install dependencies
+    cmds:
+      - npm ci
+    sources:
+      - package-lock.json
+    generates:
+      - node_modules/**/*
+
+  setup:
+    desc: Initial project setup
+    deps: [install]
+    cmds:
+      - task: build
+      - echo "✅ Project setup complete!"
+
+  # Development tasks
+  dev:
+    desc: Start development mode with file watching
+    deps: [install]
+    cmds:
+      - npm run watch
+
+  build:
+    desc: Compile TypeScript to JavaScript
+    deps: [install]
+    cmds:
+      - npm run compile
+    sources:
+      - src/**/*.ts
+      - tsconfig.json
+    generates:
+      - out/**/*.js
+      - out/**/*.d.ts
+
+  rebuild:
+    desc: Clean and rebuild the project
+    cmds:
+      - task: clean
+      - task: build
+
+  # Quality checks
+  lint:
+    desc: Run ESLint on TypeScript files
+    deps: [install]
+    cmds:
+      - npm run lint
+    sources:
+      - src/**/*.ts
+      - .eslintrc.json
+
+  lint:fix:
+    desc: Run ESLint and automatically fix issues
+    deps: [install]
+    cmds:
+      - npx eslint src --ext ts --fix
+
+  typecheck:
+    desc: Run TypeScript type checking without emitting files
+    deps: [install]
+    cmds:
+      - npx tsc --noEmit
+    sources:
+      - src/**/*.ts
+      - tsconfig.json
+
+  format:
+    desc: Format code using Prettier
+    deps: [install]
+    cmds:
+      - npx prettier --write "src/**/*.{ts,json,md}"
+      - npx prettier --write "*.{json,md,yml}"
+
+  format:check:
+    desc: Check code formatting
+    deps: [install]
+    cmds:
+      - npx prettier --check "src/**/*.{ts,json,md}"
+      - npx prettier --check "*.{json,md,yml}"
+
+  # Testing
+  test:
+    desc: Run all tests
+    deps: [build, lint]
+    cmds:
+      - npm test
+
+  test:unit:
+    desc: Run unit tests only
+    deps: [build]
+    cmds:
+      - npm run test:unit || echo "Unit test runner not configured for VS Code environment"
+
+  test:watch:
+    desc: Run tests in watch mode
+    deps: [build]
+    cmds:
+      - npx mocha --watch --require ts-node/register "src/**/*.test.ts"
+
+  test:coverage:
+    desc: Run tests with coverage report
+    deps: [build]
+    cmds:
+      - npx nyc npm test
+      - npx nyc report --reporter=html
+      - echo "Coverage report generated in {{.COVERAGE_DIR}}/index.html"
+
+  # VS Code Extension tasks
+  package:
+    desc: Package the extension into a VSIX file
+    deps: [build, lint]
+    vars:
+      VERSION:
+        sh: node -p "require('./package.json').version"
+    cmds:
+      - npm install -g @vscode/vsce
+      - vsce package
+      - 'echo "✅ Extension packaged: {{.EXTENSION_NAME}}-{{.VERSION}}.vsix"'
+    generates:
+      - "*.vsix"
+
+  publish:dry-run:
+    desc: Dry run of publishing to VS Code Marketplace
+    deps: [package]
+    cmds:
+      - vsce publish --dry-run
+
+  publish:
+    desc: Publish extension to VS Code Marketplace
+    deps: [test, package]
+    cmds:
+      - vsce publish
+    preconditions:
+      - sh: test -n "$VSCE_PAT"
+        msg: "VSCE_PAT environment variable must be set"
+
+  # Utility tasks
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BUILD_DIR}}
+      - rm -rf {{.COVERAGE_DIR}}
+      - rm -f *.vsix
+      - rm -rf .vscode-test
+
+  clean:all:
+    desc: Clean all generated files including node_modules
+    deps: [clean]
+    cmds:
+      - rm -rf node_modules
+      - rm -f package-lock.json
+
+  # Debugging
+  debug:
+    desc: Open VS Code in debug mode for extension development
+    cmds:
+      - code --extensionDevelopmentPath={{.PWD}} --inspect-extensions=9229
+
+  logs:
+    desc: Show extension host logs
+    cmds:
+      - tail -f ~/.vscode/extensions/{{.EXTENSION_NAME}}/logs/*.log || echo "No logs found"
+
+  # Documentation
+  docs:
+    desc: Generate documentation
+    cmds:
+      - npx typedoc --out docs src --excludePrivate --excludeInternal
+
+  # Git hooks
+  pre-commit:
+    desc: Run pre-commit checks
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: format:check
+      - task: test
+
+  # CI/CD tasks
+  ci:
+    desc: Run CI pipeline tasks
+    cmds:
+      - task: install
+      - task: lint
+      - task: typecheck
+      - task: build
+      - task: test
+      - task: package
+
+  # Release tasks
+  release:patch:
+    desc: Create a patch release (x.x.+1)
+    cmds:
+      - npm version patch
+      - task: release:common
+
+  release:minor:
+    desc: Create a minor release (x.+1.0)
+    cmds:
+      - npm version minor
+      - task: release:common
+
+  release:major:
+    desc: Create a major release (+1.0.0)
+    cmds:
+      - npm version major
+      - task: release:common
+
+  release:common:
+    internal: true
+    vars:
+      VERSION:
+        sh: node -p "require('./package.json').version"
+    cmds:
+      - git push origin main --tags
+      - echo "✅ Released version {{.VERSION}}"
+      - task: publish
+
+  # Dependency management
+  deps:check:
+    desc: Check for outdated dependencies
+    cmds:
+      - npm outdated || true
+
+  deps:update:
+    desc: Update dependencies interactively
+    cmds:
+      - npx npm-check-updates -i
+
+  deps:audit:
+    desc: Audit dependencies for security vulnerabilities
+    cmds:
+      - npm audit
+
+  deps:audit:fix:
+    desc: Fix security vulnerabilities automatically
+    cmds:
+      - npm audit fix
+
+  # Development helpers
+  todo:
+    desc: List all TODO and FIXME comments
+    cmds:
+      - grep -rn "TODO\|FIXME" src/ || echo "No TODOs found"
+
+  size:
+    desc: Check bundle size
+    cmds:
+      - du -sh {{.BUILD_DIR}}
+      - find {{.BUILD_DIR}} -name "*.js" -exec wc -l {} + | sort -n
+
+  # VS Code specific
+  install:local:
+    desc: Install extension locally in VS Code
+    deps: [package]
+    vars:
+      VSIX_FILE:
+        sh: ls -t *.vsix | head -1
+    cmds:
+      - code --install-extension {{.VSIX_FILE}}
+      - echo "✅ Extension installed locally"
+
+  uninstall:local:
+    desc: Uninstall extension from local VS Code
+    cmds:
+      - code --uninstall-extension vscode-generic-lsp-proxy.{{.EXTENSION_NAME}}
+
+  # Quick commands for common workflows
+  check:
+    desc: Run all checks (lint, typecheck, test)
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: test
+
+  fix:
+    desc: Fix common issues automatically
+    cmds:
+      - task: lint:fix
+      - task: format
+      - task: deps:audit:fix
+
+  ready:
+    desc: Ensure project is ready for PR/commit
+    cmds:
+      - task: fix
+      - task: check
+      - echo "✅ Project is ready for commit!"

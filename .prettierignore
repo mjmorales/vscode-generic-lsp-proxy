@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+out/
+dist/
+*.vsix
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# VS Code
+.vscode-test/
+
+# Logs
+*.log
+
+# Generated files
+*.d.ts
+*.d.ts.map
+
+# Package files
+package-lock.json

@@ -10,12 +10,13 @@ export interface LSPServerConfig {
     fileExtensions: string[];
     filePatterns?: string[];
     workspacePattern?: string;
-    initializationOptions?: any;
-    settings?: any;
+    initializationOptions?: Record<string, unknown>;
+    settings?: Record<string, unknown>;
     env?: { [key: string]: string };
     transport?: 'stdio' | 'tcp' | 'websocket';
     tcpPort?: number;
     websocketUrl?: string;
+    disabled?: boolean;
 }
 
 export class ConfigurationManager {
@@ -47,6 +48,14 @@ export class ConfigurationManager {
 
         await this.loadGlobalConfig();
 
+        // Restore disabled state from workspace state
+        const disabledConfigs = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
+        for (const config of this.configs) {
+            if (disabledConfigs.includes(config.languageId)) {
+                config.disabled = true;
+            }
+        }
+        
         this.buildMaps();
         this.logger.info(`Loaded ${this.configs.length} LSP configurations`);
     }
@@ -99,24 +108,25 @@ export class ConfigurationManager {
         }
     }
 
-    private validateConfig(config: any): config is LSPServerConfig {
-        if (!config.languageId || typeof config.languageId !== 'string') {
+    private validateConfig(config: unknown): config is LSPServerConfig {
+        const cfg = config as Record<string, unknown>;
+        if (!cfg.languageId || typeof cfg.languageId !== 'string') {
             this.logger.error('Invalid config: missing or invalid languageId');
             return false;
         }
 
-        if (!config.command || typeof config.command !== 'string') {
-            this.logger.error(`Invalid config for ${config.languageId}: missing or invalid command`);
+        if (!cfg.command || typeof cfg.command !== 'string') {
+            this.logger.error(`Invalid config for ${cfg.languageId}: missing or invalid command`);
             return false;
         }
 
-        if (!config.fileExtensions || !Array.isArray(config.fileExtensions) || config.fileExtensions.length === 0) {
-            this.logger.error(`Invalid config for ${config.languageId}: missing or invalid fileExtensions`);
+        if (!cfg.fileExtensions || !Array.isArray(cfg.fileExtensions) || cfg.fileExtensions.length === 0) {
+            this.logger.error(`Invalid config for ${cfg.languageId}: missing or invalid fileExtensions`);
             return false;
         }
 
-        if (config.transport && !['stdio', 'tcp', 'websocket'].includes(config.transport)) {
-            this.logger.error(`Invalid config for ${config.languageId}: invalid transport ${config.transport}`);
+        if (cfg.transport && !['stdio', 'tcp', 'websocket'].includes(cfg.transport as string)) {
+            this.logger.error(`Invalid config for ${cfg.languageId}: invalid transport ${cfg.transport}`);
             return false;
         }
 
@@ -125,6 +135,12 @@ export class ConfigurationManager {
 
     private buildMaps(): void {
         for (const config of this.configs) {
+            // Skip disabled configurations
+            if (config.disabled) {
+                this.logger.info(`Skipping disabled configuration for ${config.languageId}`);
+                continue;
+            }
+            
             this.languageIdMap.set(config.languageId, config);
             
             for (const ext of config.fileExtensions) {
@@ -151,10 +167,17 @@ export class ConfigurationManager {
 
         if (!config) {
             for (const cfg of this.configs) {
+                // Skip disabled configurations
+                if (cfg.disabled) continue;
+                
                 if (cfg.filePatterns) {
                     for (const pattern of cfg.filePatterns) {
+                        const workspaceFolder = cfg.workspacePattern || 
+                            (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]);
+                        if (!workspaceFolder) continue;
+                        
                         const globPattern = new vscode.RelativePattern(
-                            cfg.workspacePattern || vscode.workspace.workspaceFolders![0],
+                            workspaceFolder,
                             pattern
                         );
                         if (vscode.languages.match({ pattern: globPattern }, document)) {
@@ -182,5 +205,50 @@ export class ConfigurationManager {
 
     getAllConfigs(): LSPServerConfig[] {
         return [...this.configs];
+    }
+
+    markConfigAsDisabled(languageId: string): void {
+        const config = this.configs.find(c => c.languageId === languageId);
+        if (config) {
+            config.disabled = true;
+            this.logger.info(`Marked configuration for ${languageId} as disabled`);
+            
+            // Save the disabled state to workspace state
+            const disabledConfigs = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
+            if (!disabledConfigs.includes(languageId)) {
+                disabledConfigs.push(languageId);
+                this.context.workspaceState.update('disabledLspConfigs', disabledConfigs);
+            }
+            
+            // Rebuild maps to remove disabled config
+            this.fileExtensionMap.clear();
+            this.languageIdMap.clear();
+            this.buildMaps();
+        }
+    }
+
+    enableConfig(languageId: string): void {
+        const config = this.configs.find(c => c.languageId === languageId);
+        if (config) {
+            config.disabled = false;
+            this.logger.info(`Re-enabled configuration for ${languageId}`);
+            
+            // Update workspace state
+            const disabledConfigs = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
+            const index = disabledConfigs.indexOf(languageId);
+            if (index > -1) {
+                disabledConfigs.splice(index, 1);
+                this.context.workspaceState.update('disabledLspConfigs', disabledConfigs);
+            }
+            
+            // Rebuild maps to include re-enabled config
+            this.fileExtensionMap.clear();
+            this.languageIdMap.clear();
+            this.buildMaps();
+        }
+    }
+
+    getDisabledConfigs(): LSPServerConfig[] {
+        return this.configs.filter(c => c.disabled);
     }
 }
