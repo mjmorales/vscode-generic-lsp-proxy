@@ -16,7 +16,6 @@ interface ClientInfo {
     config: LSPServerConfig;
     status: 'starting' | 'running' | 'stopped' | 'error';
     documentCount: number;
-    lastError?: string;
 }
 
 export class LspProxyManager extends EventEmitter {
@@ -28,6 +27,11 @@ export class LspProxyManager extends EventEmitter {
         private logger: Logger
     ) {
         super();
+        this.updateConfigFromSettings();
+    }
+
+    private updateConfigFromSettings(): void {
+        // Configuration updates can be added here if needed
     }
 
     async ensureClientForConfig(config: LSPServerConfig, document: vscode.TextDocument): Promise<void> {
@@ -92,8 +96,6 @@ export class LspProxyManager extends EventEmitter {
             const clientInfo = this.clients.get(config.languageId);
             if (clientInfo) {
                 clientInfo.status = 'error';
-                clientInfo.lastError = error instanceof Error ? error.message : String(error);
-                // State change handler will schedule restart when client transitions to stopped
             }
         }
     }
@@ -190,6 +192,7 @@ export class LspProxyManager extends EventEmitter {
 
         this.emit('serversChanged');
     }
+
 
     private trackDocument(languageId: string, documentUri: string): void {
         let documentSet = this.documentTracking.get(languageId);

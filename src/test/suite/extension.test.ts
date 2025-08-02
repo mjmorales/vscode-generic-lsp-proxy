@@ -53,8 +53,6 @@ suite('Extension Test Suite', () => {
         const properties = contributions.configuration.properties;
         assert.ok(properties['genericLspProxy.configPath']);
         assert.ok(properties['genericLspProxy.enableDebugLogging']);
-        assert.ok(properties['genericLspProxy.autoRestart']);
-        assert.ok(properties['genericLspProxy.restartDelay']);
     });
 
     test('Should load configuration when workspace contains config file', async function() {
@@ -129,8 +127,6 @@ suite('Extension Test Suite', () => {
         
         assert.strictEqual(config.get('configPath'), '.vscode/lsp-proxy.json');
         assert.strictEqual(config.get('enableDebugLogging'), false);
-        assert.strictEqual(config.get('autoRestart'), true);
-        assert.strictEqual(config.get('restartDelay'), 1000);
     });
 
     test('Extension should handle missing configuration gracefully', async function() {
