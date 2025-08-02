@@ -32,11 +32,9 @@ jobs:
     - name: Compile
       run: npm run compile
     
-    - name: Run tests
-      run: npm test
+    - name: Run tests (Ubuntu with virtual display)
+      run: xvfb-run -a npm test
       if: matrix.os == 'ubuntu-latest'
-      env:
-        DISPLAY: ':99.0'
     
     - name: Run tests (Windows/macOS)
       run: npm test
