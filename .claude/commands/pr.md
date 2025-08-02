@@ -1,0 +1,8 @@
+- If on master branch, create a new branch and checkout to it
+- Group code changes by logical units.
+- Commit them in batches using semantic versioning.
+- Validate the branch passes linters and tests
+- Fix if required and commit
+- Push branch to remote
+- Create the PR
+- Paste a link to the PR webpage

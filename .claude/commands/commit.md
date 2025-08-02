@@ -1,0 +1,2 @@
+- Group code changes by logical units.
+- Commit them in batches using semantic versioning.
