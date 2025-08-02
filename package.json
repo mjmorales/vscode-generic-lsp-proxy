@@ -2,7 +2,7 @@
   "name": "generic-lsp-proxy",
   "displayName": "Generic LSP Proxy",
   "description": "A flexible LSP proxy that dynamically forwards to any Language Server Protocol server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "mjmorales",
   "engines": {
     "vscode": "^1.75.0"
