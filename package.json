@@ -27,7 +27,6 @@
   "homepage": "https://github.com/mjmorales/vscode-generic-lsp-proxy#readme",
   "activationEvents": [
     "onStartupFinished",
-    "onLanguage:*",
     "workspaceContains:**/.lsp-proxy.json",
     "workspaceContains:**/.vscode/lsp-proxy.json"
   ],

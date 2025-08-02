@@ -39,7 +39,7 @@ suite('Extension Test Suite', () => {
         const packageJSON = extension.packageJSON;
         assert.ok(packageJSON.activationEvents);
         assert.ok(packageJSON.activationEvents.includes('onStartupFinished'));
-        assert.ok(packageJSON.activationEvents.includes('onLanguage:*'));
+        assert.ok(packageJSON.activationEvents.includes('workspaceContains:**/.lsp-proxy.json'));
     });
 
     test('Should contribute configuration properties', () => {
