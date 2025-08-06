@@ -361,7 +361,7 @@ async function handleInitCommand(context: vscode.ExtensionContext) {
         // Ask for optional arguments
         const args = await vscode.window.showInputBox({
             prompt: 'Enter command arguments (optional, comma-separated)',
-            placeHolder: '--stdio, --verbose',
+            placeHolder: '',
             ignoreFocusOut: true
         });
 
