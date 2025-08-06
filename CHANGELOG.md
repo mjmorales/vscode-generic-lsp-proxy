@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v1.0.2...v1.0.3) (2025-08-06)
+
+
+### Bug Fixes
+
+* don't set default args on empty ([19c034e](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/19c034e81b9033c906f3d79b0278d1b51e8f2468))
+
 ## [1.0.2](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v1.0.1...v1.0.2) (2025-08-02)
 
 
