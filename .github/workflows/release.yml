@@ -44,7 +44,7 @@ jobs:
         run: npx semantic-release
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: success()
         with:
           name: vscode-generic-lsp-proxy
