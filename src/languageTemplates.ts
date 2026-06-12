@@ -3,7 +3,12 @@ import { LSPServerConfig } from './configurationManager';
 export interface LanguageTemplate {
     name: string;
     description: string;
-    installCommand?: string;
+    /**
+     * How to obtain the language server. `command` is set only when a single
+     * runnable shell command exists (so the UI can offer "Copy Command"); `note`
+     * carries human prose/alternatives that are not directly executable.
+     */
+    install?: { command?: string; note?: string };
     config: LSPServerConfig;
 }
 
@@ -11,7 +16,7 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'TypeScript/JavaScript',
         description: 'TypeScript and JavaScript language server',
-        installCommand: 'npm install -g typescript-language-server typescript',
+        install: { command: 'npm install -g typescript-language-server typescript' },
         config: {
             languageId: 'typescript',
             command: 'typescript-language-server',
@@ -34,7 +39,7 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'Python (pylsp)',
         description: 'Python Language Server (pylsp) with all plugins',
-        installCommand: 'pip install "python-lsp-server[all]" python-lsp-black python-lsp-mypy python-lsp-isort python-lsp-ruff',
+        install: { command: 'pip install "python-lsp-server[all]" python-lsp-black python-lsp-mypy python-lsp-isort python-lsp-ruff' },
         config: {
             languageId: 'python',
             command: 'pylsp',
@@ -77,7 +82,7 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'Python (Pyright)',
         description: 'Microsoft Pyright - fast Python static type checker',
-        installCommand: 'npm install -g pyright',
+        install: { command: 'npm install -g pyright' },
         config: {
             languageId: 'python',
             command: 'pyright-langserver',
@@ -109,7 +114,7 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'Rust',
         description: 'Rust Analyzer - official Rust language server',
-        installCommand: 'rustup component add rust-analyzer',
+        install: { command: 'rustup component add rust-analyzer' },
         config: {
             languageId: 'rust',
             command: 'rust-analyzer',
@@ -178,7 +183,7 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'Go',
         description: 'gopls - official Go language server',
-        installCommand: 'go install golang.org/x/tools/gopls@latest',
+        install: { command: 'go install golang.org/x/tools/gopls@latest' },
         config: {
             languageId: 'go',
             command: 'gopls',
@@ -206,7 +211,6 @@ export const languageTemplates: LanguageTemplate[] = [
                 },
                 hoverKind: 'FullDocumentation',
                 linkTarget: 'pkg.go.dev',
-                buildFlags: ['-tags=integration,unit'],
                 env: {
                     GOFLAGS: '-mod=readonly'
                 },
@@ -226,7 +230,7 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'C/C++ (clangd)',
         description: 'Clangd - LLVM-based C/C++ language server',
-        installCommand: 'brew install llvm # or: apt install clangd',
+        install: { command: 'brew install llvm', note: 'On Debian/Ubuntu: apt install clangd' },
         config: {
             languageId: 'cpp',
             command: 'clangd',
@@ -256,14 +260,13 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'Java',
         description: 'Eclipse JDT Language Server',
-        installCommand: 'Download jdtls from https://download.eclipse.org/jdtls/snapshots/latest.tar.gz',
+        install: { note: 'Download jdtls from https://download.eclipse.org/jdtls/snapshots/latest.tar.gz' },
         config: {
             languageId: 'java',
             command: 'jdtls',
             fileExtensions: ['.java'],
             initializationOptions: {
                 bundles: [],
-                workspaceFolders: ['file:///workspace'],
                 settings: {
                     java: {
                         home: null,
@@ -321,7 +324,7 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'Lua',
         description: 'Lua Language Server - feature-rich Lua LSP',
-        installCommand: 'brew install lua-language-server # or download from GitHub releases',
+        install: { command: 'brew install lua-language-server', note: 'Or download a prebuilt binary from the GitHub releases page' },
         config: {
             languageId: 'lua',
             command: 'lua-language-server',
@@ -394,12 +397,13 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'Ruby (Solargraph)',
         description: 'Solargraph - comprehensive Ruby language server',
-        installCommand: 'gem install solargraph',
+        install: { command: 'gem install solargraph' },
         config: {
             languageId: 'ruby',
             command: 'solargraph',
             args: ['stdio'],
-            fileExtensions: ['.rb', '.erb', '.rake', '.gemspec', 'Gemfile', 'Rakefile'],
+            fileExtensions: ['.rb', '.erb', '.rake', '.gemspec'],
+            filePatterns: ['**/Gemfile', '**/Rakefile'],
             initializationOptions: {
                 formatting: true,
                 hover: true,
@@ -460,7 +464,7 @@ export const languageTemplates: LanguageTemplate[] = [
     {
         name: 'PHP (Intelephense)',
         description: 'Intelephense - high performance PHP language server',
-        installCommand: 'npm install -g intelephense',
+        install: { command: 'npm install -g intelephense' },
         config: {
             languageId: 'php',
             command: 'intelephense',
@@ -547,98 +551,151 @@ export const languageTemplates: LanguageTemplate[] = [
                 }
             }
         }
-    },
-    {
-        name: 'Custom/Other',
-        description: 'Configure a custom language server with all available options',
-        installCommand: '# Install your custom language server here',
-        config: {
-            // Required fields
-            languageId: 'custom',
-            command: 'your-lsp-command',
-            fileExtensions: ['.ext', '.myext'],
-            
-            // Optional command arguments
-            args: ['--stdio', '--verbose'],
-            
-            // File matching patterns (in addition to extensions)
-            filePatterns: ['**/*.config', '**/special-file-name'],
-            
-            // Workspace pattern to restrict this server to specific folders
-            workspacePattern: '**/*',
-            
-            // Transport configuration
-            transport: 'stdio', // Options: 'stdio' | 'tcp' | 'websocket'
-            tcpPort: 9999, // Required if transport is 'tcp'
-            websocketUrl: 'ws://localhost:8080/lsp', // Required if transport is 'websocket'
-            
-            // LSP initialization options
-            initializationOptions: {
-                // Server-specific initialization parameters
-                cacheDirectory: '/tmp/lsp-cache',
-                formatOnSave: true,
-                lintOnSave: true,
-                maxNumberOfProblems: 100,
-                trace: {
-                    server: 'verbose'
-                },
-                // Custom options specific to your server
-                customOption1: 'value1',
-                customOption2: {
-                    nested: true,
-                    value: 42
-                }
+    }
+];
+
+/**
+ * Reference-only skeleton documenting every field a custom config may set.
+ *
+ * This is intentionally NOT part of the selectable languageTemplates array: it is
+ * never offered in the template picker, never loaded, and never written to a
+ * user's config. Its placeholder values (a dummy command, globs, env-var
+ * interpolation, etc.) would otherwise be serialized verbatim into a real,
+ * loadable config and the proxy would try to spawn the placeholder command. The
+ * interactive "Custom Configuration" wizard handles real custom setups instead.
+ *
+ * The websocket transport is unsupported (LSPServerConfig.transport is
+ * stdio or tcp only), so no websocket field appears here.
+ */
+export const CUSTOM_TEMPLATE_DOC: LanguageTemplate = {
+    name: 'Custom/Other',
+    description: 'Configure a custom language server with all available options',
+    install: { note: 'Install your custom language server, then point `command` at its executable.' },
+    config: {
+        // Required fields
+        languageId: 'custom',
+        command: 'your-lsp-command',
+        fileExtensions: ['.ext', '.myext'],
+
+        // Optional command arguments
+        args: ['--stdio', '--verbose'],
+
+        // File matching patterns (in addition to extensions)
+        filePatterns: ['**/*.config', '**/special-file-name'],
+
+        // Workspace pattern to restrict this server to specific folders
+        workspacePattern: '**/*',
+
+        // Transport configuration. Supported: 'stdio' | 'tcp' (websocket is unsupported).
+        transport: 'stdio',
+        tcpPort: 9999, // Required if transport is 'tcp'
+
+        // LSP initialization options
+        initializationOptions: {
+            // Server-specific initialization parameters
+            cacheDirectory: '/tmp/lsp-cache',
+            formatOnSave: true,
+            lintOnSave: true,
+            maxNumberOfProblems: 100,
+            trace: {
+                server: 'verbose'
             },
-            
-            // Language-specific settings
-            settings: {
-                // These are sent via workspace/didChangeConfiguration
-                myLanguage: {
+            // Custom options specific to your server
+            customOption1: 'value1',
+            customOption2: {
+                nested: true,
+                value: 42
+            }
+        },
+
+        // Language-specific settings
+        settings: {
+            // These are sent via workspace/didChangeConfiguration
+            myLanguage: {
+                enable: true,
+                validate: {
                     enable: true,
-                    validate: {
-                        enable: true,
-                        lint: true,
-                        syntaxCheck: true
-                    },
-                    format: {
-                        enable: true,
-                        tabSize: 4,
-                        insertSpaces: true,
-                        trimTrailingWhitespace: true,
-                        insertFinalNewline: true
-                    },
-                    suggest: {
-                        enable: true,
-                        autoTriggerCompletions: true,
-                        includeSnippets: true,
-                        maxItems: 50
-                    },
-                    diagnostics: {
-                        enable: true,
-                        showWarnings: true,
-                        showErrors: true,
-                        showHints: true,
-                        debounceTime: 500
-                    },
-                    advanced: {
-                        maxFileSize: 1048576, // 1MB
-                        excludePatterns: ['**/node_modules/**', '**/dist/**'],
-                        includePatterns: ['**/*.ext'],
-                        workspaceSymbolSearchLimit: 1000,
-                        documentSymbolSearchLimit: 500
-                    }
+                    lint: true,
+                    syntaxCheck: true
+                },
+                format: {
+                    enable: true,
+                    tabSize: 4,
+                    insertSpaces: true,
+                    trimTrailingWhitespace: true,
+                    insertFinalNewline: true
+                },
+                suggest: {
+                    enable: true,
+                    autoTriggerCompletions: true,
+                    includeSnippets: true,
+                    maxItems: 50
+                },
+                diagnostics: {
+                    enable: true,
+                    showWarnings: true,
+                    showErrors: true,
+                    showHints: true,
+                    debounceTime: 500
+                },
+                advanced: {
+                    maxFileSize: 1048576, // 1MB
+                    excludePatterns: ['**/node_modules/**', '**/dist/**'],
+                    includePatterns: ['**/*.ext'],
+                    workspaceSymbolSearchLimit: 1000,
+                    documentSymbolSearchLimit: 500
                 }
-            },
-            
-            // Environment variables for the server process
-            env: {
-                MY_LANGUAGE_HOME: '/usr/local/my-language',
-                MY_LANGUAGE_SDK: '/usr/local/my-language/sdk',
-                PATH: '${env:PATH}:/usr/local/my-language/bin',
-                DEBUG: 'true',
-                LOG_LEVEL: 'debug',
-                CUSTOM_ENV_VAR: 'custom-value'
+            }
+        },
+
+        // Environment variables for the server process
+        env: {
+            MY_LANGUAGE_HOME: '/usr/local/my-language',
+            MY_LANGUAGE_SDK: '/usr/local/my-language/sdk',
+            PATH: '${env:PATH}:/usr/local/my-language/bin',
+            DEBUG: 'true',
+            LOG_LEVEL: 'debug',
+            CUSTOM_ENV_VAR: 'custom-value'
+        }
+    }
+};
+
+/**
+ * Dev-time drift guard for `languageTemplates`. Returns a list of human-readable
+ * problems (empty when the registry is well-formed). Intended to be called at
+ * activation under debug, or from a unit test.
+ *
+ * Note: two templates may legally share a `languageId` (e.g. pylsp and pyright
+ * are both `python`) as long as their `command` differs, so the identity check
+ * is on the `(languageId, command)` pair, not `languageId` alone.
+ */
+export function validateTemplates(): string[] {
+    const problems: string[] = [];
+    const seenNames = new Set<string>();
+    const seenPairs = new Set<string>();
+
+    for (const template of languageTemplates) {
+        if (seenNames.has(template.name)) {
+            problems.push(`Duplicate template name: '${template.name}'`);
+        }
+        seenNames.add(template.name);
+
+        const { languageId, command, fileExtensions } = template.config;
+        const pair = `${languageId} ${command}`;
+        if (seenPairs.has(pair)) {
+            problems.push(`Duplicate (languageId, command) pair: '${languageId}' + '${command}'`);
+        }
+        seenPairs.add(pair);
+
+        for (const ext of fileExtensions) {
+            if (!ext.startsWith('.')) {
+                problems.push(`Template '${template.name}': fileExtensions entry '${ext}' does not start with '.'`);
+            }
+            if (ext.includes('/') || ext.includes('\\')) {
+                problems.push(`Template '${template.name}': fileExtensions entry '${ext}' contains a path separator`);
             }
         }
     }
-];
+
+    return problems;
+}

@@ -4,6 +4,7 @@ import * as path from 'path';
 import { Logger } from './logger';
 
 export interface LSPServerConfig {
+    id?: string; // populated after load; stable identity
     languageId: string;
     command: string;
     args?: string[];
@@ -13,10 +14,25 @@ export interface LSPServerConfig {
     initializationOptions?: Record<string, unknown>;
     settings?: Record<string, unknown>;
     env?: { [key: string]: string };
-    transport?: 'stdio' | 'tcp' | 'websocket';
+    transport?: 'stdio' | 'tcp';
     tcpPort?: number;
-    websocketUrl?: string;
+    tcpHost?: string; // optional, default applied in lspProxyManager
     disabled?: boolean;
+}
+
+/**
+ * Resolve `p` against `folderFsPath`, returning the absolute path only if it stays
+ * within `folderFsPath`. Returns `undefined` for inputs that escape the folder (via `..`)
+ * or are absolute. `configPath` is workspace-controlled (untrusted in unverified repos),
+ * so this guards path-traversal out of the workspace.
+ */
+export function resolveWithinFolder(folderFsPath: string, p: string): string | undefined {
+    const resolved = path.resolve(folderFsPath, p);
+    const rel = path.relative(folderFsPath, resolved);
+    if (path.isAbsolute(rel) || rel === '..' || rel.startsWith(`..${path.sep}`)) {
+        return undefined;
+    }
+    return resolved;
 }
 
 export class ConfigurationManager {
@@ -48,12 +64,11 @@ export class ConfigurationManager {
 
         await this.loadGlobalConfig();
 
-        // Restore disabled state from workspace state
-        const disabledConfigs = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
+        // Restore disabled state from workspace state (keyed by stable id).
+        // Merge with the file-declared flag so either source can disable a config.
+        const disabledIds = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
         for (const config of this.configs) {
-            if (disabledConfigs.includes(config.languageId)) {
-                config.disabled = true;
-            }
+            config.disabled = disabledIds.includes(config.id!) || config.disabled;
         }
         
         this.buildMaps();
@@ -61,8 +76,12 @@ export class ConfigurationManager {
     }
 
     private async loadConfigFromWorkspace(folder: vscode.WorkspaceFolder, configPath: string): Promise<void> {
-        const absolutePath = path.join(folder.uri.fsPath, configPath);
-        
+        const absolutePath = resolveWithinFolder(folder.uri.fsPath, configPath);
+        if (absolutePath === undefined) {
+            this.logger.error(`Invalid configPath "${configPath}": escapes workspace folder ${folder.uri.fsPath}; skipping`);
+            return;
+        }
+
         if (!fs.existsSync(absolutePath)) {
             const alternativePath = path.join(folder.uri.fsPath, '.lsp-proxy.json');
             if (fs.existsSync(alternativePath)) {
@@ -82,19 +101,23 @@ export class ConfigurationManager {
             if (Array.isArray(configs)) {
                 for (const config of configs) {
                     if (this.validateConfig(config)) {
-                        if (folder && config.workspacePattern === undefined) {
-                            config.workspacePattern = folder.uri.fsPath;
-                        }
-                        this.configs.push(config);
-                        this.logger.info(`Loaded config for ${config.languageId} from ${filePath}`);
+                        const stored: LSPServerConfig = {
+                            ...config,
+                            id: this.configId(config),
+                            workspacePattern: config.workspacePattern ?? folder?.uri.fsPath,
+                        };
+                        this.configs.push(stored);
+                        this.logger.info(`Loaded config for ${stored.languageId} from ${filePath}`);
                     }
                 }
             } else if (this.validateConfig(configs)) {
-                if (folder && configs.workspacePattern === undefined) {
-                    configs.workspacePattern = folder.uri.fsPath;
-                }
-                this.configs.push(configs);
-                this.logger.info(`Loaded config for ${configs.languageId} from ${filePath}`);
+                const stored: LSPServerConfig = {
+                    ...configs,
+                    id: this.configId(configs),
+                    workspacePattern: configs.workspacePattern ?? folder?.uri.fsPath,
+                };
+                this.configs.push(stored);
+                this.logger.info(`Loaded config for ${stored.languageId} from ${filePath}`);
             }
         } catch (error) {
             this.logger.error(`Failed to load config from ${filePath}: ${error}`);
@@ -108,29 +131,75 @@ export class ConfigurationManager {
         }
     }
 
+    /** Deterministic stable identity. pylsp/pyright (same languageId) get distinct ids via their command. */
+    private configId(c: LSPServerConfig): string {
+        return `${c.languageId}::${c.command}`;
+    }
+
     private validateConfig(config: unknown): config is LSPServerConfig {
         const cfg = config as Record<string, unknown>;
         if (!cfg.languageId || typeof cfg.languageId !== 'string') {
             this.logger.error('Invalid config: missing or invalid languageId');
             return false;
         }
+        const languageId = cfg.languageId;
 
         if (!cfg.command || typeof cfg.command !== 'string') {
-            this.logger.error(`Invalid config for ${cfg.languageId}: missing or invalid command`);
+            this.logger.error(`Invalid config for ${languageId}: missing or invalid command`);
             return false;
         }
 
-        if (!cfg.fileExtensions || !Array.isArray(cfg.fileExtensions) || cfg.fileExtensions.length === 0) {
-            this.logger.error(`Invalid config for ${cfg.languageId}: missing or invalid fileExtensions`);
+        if (!Array.isArray(cfg.fileExtensions) || cfg.fileExtensions.length === 0) {
+            this.logger.error(`Invalid config for ${languageId}: missing or invalid fileExtensions`);
+            return false;
+        }
+        if (!cfg.fileExtensions.every(e => typeof e === 'string')) {
+            this.logger.error(`Invalid config for ${languageId}: fileExtensions must be an array of strings`);
             return false;
         }
 
-        if (cfg.transport && !['stdio', 'tcp', 'websocket'].includes(cfg.transport as string)) {
-            this.logger.error(`Invalid config for ${cfg.languageId}: invalid transport ${cfg.transport}`);
+        if (cfg.filePatterns !== undefined &&
+            (!Array.isArray(cfg.filePatterns) || !cfg.filePatterns.every(p => typeof p === 'string'))) {
+            this.logger.error(`Invalid config for ${languageId}: filePatterns must be an array of strings`);
+            return false;
+        }
+
+        if (cfg.args !== undefined &&
+            (!Array.isArray(cfg.args) || !cfg.args.every(a => typeof a === 'string'))) {
+            this.logger.error(`Invalid config for ${languageId}: args must be an array of strings`);
+            return false;
+        }
+
+        if (cfg.env !== undefined) {
+            const env = cfg.env;
+            if (typeof env !== 'object' || env === null || Array.isArray(env) ||
+                !Object.values(env).every(v => typeof v === 'string')) {
+                this.logger.error(`Invalid config for ${languageId}: env must be a record of string to string`);
+                return false;
+            }
+        }
+
+        if (cfg.tcpPort !== undefined && !this.isValidTcpPort(cfg.tcpPort)) {
+            this.logger.error(`Invalid config for ${languageId}: tcpPort must be an integer in 1..65535`);
+            return false;
+        }
+
+        if (cfg.transport && !['stdio', 'tcp'].includes(cfg.transport as string)) {
+            this.logger.error(`Invalid config for ${languageId}: invalid transport ${cfg.transport}`);
+            return false;
+        }
+
+        // Cross-field: tcp transport requires a valid port.
+        if (cfg.transport === 'tcp' && !this.isValidTcpPort(cfg.tcpPort)) {
+            this.logger.error(`Invalid config for ${languageId}: transport 'tcp' requires an integer tcpPort in 1..65535`);
             return false;
         }
 
         return true;
+    }
+
+    private isValidTcpPort(port: unknown): boolean {
+        return typeof port === 'number' && Number.isInteger(port) && port >= 1 && port <= 65535;
     }
 
     private buildMaps(): void {
@@ -141,10 +210,19 @@ export class ConfigurationManager {
                 continue;
             }
             
+            // last-wins shadowing; warn so collisions are diagnosable.
+            const shadowedByLang = this.languageIdMap.get(config.languageId);
+            if (shadowedByLang) {
+                this.logger.warn(`Multiple configs for languageId '${config.languageId}': '${config.command}' shadows '${shadowedByLang.command}'`);
+            }
             this.languageIdMap.set(config.languageId, config);
-            
+
             for (const ext of config.fileExtensions) {
                 const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
+                const shadowedByExt = this.fileExtensionMap.get(normalizedExt);
+                if (shadowedByExt) {
+                    this.logger.warn(`Multiple configs for extension '${normalizedExt}': '${config.command}' shadows '${shadowedByExt.command}'`);
+                }
                 this.fileExtensionMap.set(normalizedExt, config);
             }
         }
@@ -155,27 +233,24 @@ export class ConfigurationManager {
         const ext = path.extname(fileName);
         
         let config = this.fileExtensionMap.get(ext);
-        
+
         if (!config) {
-            for (const [languageId, cfg] of this.languageIdMap) {
-                if (document.languageId === languageId) {
-                    config = cfg;
-                    break;
-                }
-            }
+            config = this.languageIdMap.get(document.languageId);
         }
 
         if (!config) {
             for (const cfg of this.configs) {
                 // Skip disabled configurations
                 if (cfg.disabled) continue;
-                
+
                 if (cfg.filePatterns) {
+                    // RelativePattern base must be the WorkspaceFolder object, not the
+                    // workspacePattern string (which is an fsPath/glob, not a folder).
+                    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)
+                        ?? vscode.workspace.workspaceFolders?.[0];
+                    if (!workspaceFolder) continue;
+
                     for (const pattern of cfg.filePatterns) {
-                        const workspaceFolder = cfg.workspacePattern || 
-                            (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]);
-                        if (!workspaceFolder) continue;
-                        
                         const globPattern = new vscode.RelativePattern(
                             workspaceFolder,
                             pattern
@@ -190,10 +265,11 @@ export class ConfigurationManager {
             }
         }
 
-        if (config && config.workspacePattern) {
-            if (!fileName.startsWith(config.workspacePattern)) {
-                return undefined;
-            }
+        // Scope by workspacePattern only when it is an absolute path prefix;
+        // glob-shaped values (e.g. '**/*') are not path prefixes and must not gate.
+        if (config && config.workspacePattern && path.isAbsolute(config.workspacePattern)
+            && !fileName.startsWith(config.workspacePattern)) {
+            return undefined;
         }
 
         return config;
@@ -203,23 +279,27 @@ export class ConfigurationManager {
         return this.languageIdMap.get(languageId);
     }
 
+    getConfigById(id: string): LSPServerConfig | undefined {
+        return this.configs.find(c => c.id === id);
+    }
+
     getAllConfigs(): LSPServerConfig[] {
         return [...this.configs];
     }
 
-    markConfigAsDisabled(languageId: string): void {
-        const config = this.configs.find(c => c.languageId === languageId);
+    async markConfigAsDisabled(id: string): Promise<void> {
+        const config = this.configs.find(c => c.id === id);
         if (config) {
             config.disabled = true;
-            this.logger.info(`Marked configuration for ${languageId} as disabled`);
-            
-            // Save the disabled state to workspace state
-            const disabledConfigs = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
-            if (!disabledConfigs.includes(languageId)) {
-                disabledConfigs.push(languageId);
-                this.context.workspaceState.update('disabledLspConfigs', disabledConfigs);
+            this.logger.info(`Marked configuration ${id} as disabled`);
+
+            // Save the disabled state to workspace state (keyed by stable id)
+            const disabledIds = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
+            if (!disabledIds.includes(id)) {
+                disabledIds.push(id);
+                await this.persistDisabledIds(disabledIds);
             }
-            
+
             // Rebuild maps to remove disabled config
             this.fileExtensionMap.clear();
             this.languageIdMap.clear();
@@ -227,24 +307,32 @@ export class ConfigurationManager {
         }
     }
 
-    enableConfig(languageId: string): void {
-        const config = this.configs.find(c => c.languageId === languageId);
+    async enableConfig(id: string): Promise<void> {
+        const config = this.configs.find(c => c.id === id);
         if (config) {
             config.disabled = false;
-            this.logger.info(`Re-enabled configuration for ${languageId}`);
-            
-            // Update workspace state
-            const disabledConfigs = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
-            const index = disabledConfigs.indexOf(languageId);
+            this.logger.info(`Re-enabled configuration ${id}`);
+
+            // Update workspace state (keyed by stable id)
+            const disabledIds = this.context.workspaceState.get<string[]>('disabledLspConfigs', []);
+            const index = disabledIds.indexOf(id);
             if (index > -1) {
-                disabledConfigs.splice(index, 1);
-                this.context.workspaceState.update('disabledLspConfigs', disabledConfigs);
+                disabledIds.splice(index, 1);
+                await this.persistDisabledIds(disabledIds);
             }
-            
+
             // Rebuild maps to include re-enabled config
             this.fileExtensionMap.clear();
             this.languageIdMap.clear();
             this.buildMaps();
+        }
+    }
+
+    private async persistDisabledIds(disabledIds: string[]): Promise<void> {
+        try {
+            await this.context.workspaceState.update('disabledLspConfigs', disabledIds);
+        } catch (error) {
+            this.logger.error(`Failed to persist disabledLspConfigs: ${error}`);
         }
     }
 

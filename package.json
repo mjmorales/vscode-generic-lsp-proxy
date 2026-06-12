@@ -31,6 +31,11 @@
     "workspaceContains:**/.vscode/lsp-proxy.json"
   ],
   "main": "./out/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
   "contributes": {
     "configuration": {
       "type": "object",
@@ -73,6 +78,11 @@
         "command": "genericLspProxy.showDisabledServers",
         "title": "Show Disabled Servers",
         "category": "LSP Proxy"
+      },
+      {
+        "command": "genericLspProxy.disable",
+        "title": "Disable LSP Server",
+        "category": "LSP Proxy"
       }
     ]
   },
@@ -89,13 +99,11 @@
     "semantic-release:dry": "semantic-release --dry-run"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1",
-    "ws": "^8.16.0"
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@types/vscode": "^1.75.0",
     "@types/node": "^20.11.0",
-    "@types/ws": "^8.5.10",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
     "eslint": "^8.56.0",
