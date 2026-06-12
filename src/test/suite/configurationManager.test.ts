@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ConfigurationManager, LSPServerConfig } from '../../configurationManager';
+import { ConfigurationManager, LSPServerConfig, resolveWithinFolder } from '../../configurationManager';
 
 suite('ConfigurationManager Test Suite', () => {
     let configManager: ConfigurationManager;
@@ -225,9 +225,97 @@ suite('ConfigurationManager Test Suite', () => {
         ];
 
         (configManager as any).configs = configs;
-        
+
         const allConfigs = configManager.getAllConfigs();
         assert.strictEqual(allConfigs.length, 2);
         assert.deepStrictEqual(allConfigs, configs);
+    });
+
+    // --- Hardened validation (CFG-2 / CFG-4) ---
+
+    test('should reject tcp transport without a valid tcpPort', () => {
+        const cfg = {
+            languageId: 'gdscript',
+            command: 'nc',
+            fileExtensions: ['.gd'],
+            transport: 'tcp'
+        };
+
+        assert.strictEqual((configManager as any).validateConfig(cfg), false);
+        assert(mockLogger.error.calledWith(
+            "Invalid config for gdscript: transport 'tcp' requires an integer tcpPort in 1..65535"
+        ));
+    });
+
+    test('should accept tcp transport with a valid tcpPort', () => {
+        const cfg = {
+            languageId: 'gdscript',
+            command: 'nc',
+            fileExtensions: ['.gd'],
+            transport: 'tcp',
+            tcpPort: 6005
+        };
+
+        assert.strictEqual((configManager as any).validateConfig(cfg), true);
+    });
+
+    test('should reject the now-unsupported websocket transport', () => {
+        const cfg = {
+            languageId: 'typescript',
+            command: 'tsserver',
+            fileExtensions: ['.ts'],
+            transport: 'websocket'
+        };
+
+        assert.strictEqual((configManager as any).validateConfig(cfg), false);
+        assert(mockLogger.error.calledWith('Invalid config for typescript: invalid transport websocket'));
+    });
+
+    test('should reject non-string fileExtensions elements', () => {
+        const cfg = {
+            languageId: 'typescript',
+            command: 'tsserver',
+            fileExtensions: [123]
+        };
+
+        assert.strictEqual((configManager as any).validateConfig(cfg), false);
+        assert(mockLogger.error.calledWith('Invalid config for typescript: fileExtensions must be an array of strings'));
+    });
+
+    // --- Stable identity (S4): two servers for one languageId coexist ---
+
+    test('should assign distinct stable ids to two configs sharing a languageId', async () => {
+        const testConfig = [
+            { languageId: 'python', command: 'pylsp', fileExtensions: ['.py'] },
+            { languageId: 'python', command: 'pyright-langserver', fileExtensions: ['.py'] }
+        ];
+        const tempFile = path.join(__dirname, 'test-dual-python.json');
+        await fs.promises.writeFile(tempFile, JSON.stringify(testConfig));
+
+        try {
+            await (configManager as any).loadConfigFile(tempFile);
+
+            const configs = (configManager as any).configs;
+            assert.strictEqual(configs.length, 2);
+            assert.strictEqual(configManager.getConfigById('python::pylsp')?.command, 'pylsp');
+            assert.strictEqual(configManager.getConfigById('python::pyright-langserver')?.command, 'pyright-langserver');
+        } finally {
+            await fs.promises.unlink(tempFile).catch(() => {});
+        }
+    });
+});
+
+suite('resolveWithinFolder (path containment, CFG-5)', () => {
+    test('resolves a relative path inside the folder', () => {
+        const result = resolveWithinFolder('/ws', '.vscode/lsp-proxy.json');
+        assert.strictEqual(result, path.resolve('/ws', '.vscode/lsp-proxy.json'));
+    });
+
+    test('rejects a parent-directory escape', () => {
+        assert.strictEqual(resolveWithinFolder('/ws', '../evil.json'), undefined);
+    });
+
+    test('rejects an absolute path that escapes the folder', () => {
+        assert.strictEqual(resolveWithinFolder('/ws', '/etc/passwd'), undefined);
     });
 });

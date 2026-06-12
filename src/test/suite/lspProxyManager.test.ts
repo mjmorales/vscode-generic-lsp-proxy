@@ -29,6 +29,7 @@ suite('LspProxyManager Test Suite', () => {
             loadConfiguration: sandbox.stub().resolves(),
             getConfigForDocument: sandbox.stub(),
             getConfigByLanguageId: sandbox.stub(),
+            getConfigById: sandbox.stub(),
             getAllConfigs: sandbox.stub().returns([])
         } as any;
 
@@ -105,8 +106,7 @@ suite('LspProxyManager Test Suite', () => {
         (lspManager as any).clients.set('python', {
             client: mockLanguageClient,
             config,
-            status: 'running',
-            documentCount: 0
+            status: 'running'
         });
 
         const mockDocument = {
@@ -115,9 +115,10 @@ suite('LspProxyManager Test Suite', () => {
         } as any;
 
         await lspManager.ensureClientForConfig(config, mockDocument);
-        
-        const clientInfo = (lspManager as any).clients.get('python');
-        assert.strictEqual(clientInfo.documentCount, 1);
+
+        // Document count is derived from documentTracking, not stored on ClientInfo (S3/LPM-9).
+        assert.strictEqual((lspManager as any).documentTracking.get('python').size, 1);
+        assert.strictEqual(lspManager.getActiveServers()[0].documentCount, 1);
     });
 
     test('should restart client', async () => {
@@ -127,20 +128,20 @@ suite('LspProxyManager Test Suite', () => {
             fileExtensions: ['.rs']
         };
 
-        mockConfigManager.getConfigByLanguageId.withArgs('rust').returns(config);
+        // restartClient resolves the config by stable id via getConfigById (S4).
+        mockConfigManager.getConfigById.withArgs('rust').returns(config);
 
         (lspManager as any).clients.set('rust', {
             client: mockLanguageClient,
             config,
-            status: 'running',
-            documentCount: 1
+            status: 'running'
         });
 
         const stopClientStub = sandbox.stub(lspManager, 'stopClient').resolves();
         const startClientStub = sandbox.stub(lspManager as any, 'startClient').resolves();
 
         await lspManager.restartClient('rust');
-        
+
         assert(stopClientStub.calledOnceWith('rust'));
         assert(startClientStub.calledOnceWith(config));
     });
@@ -202,13 +203,17 @@ suite('LspProxyManager Test Suite', () => {
             (lspManager as any).clients.set(config.languageId, {
                 client: mockLanguageClient,
                 config: { ...config, fileExtensions: ['.ext'] },
-                status: 'running',
-                documentCount: index + 1
+                status: 'running'
             });
+            // documentCount is derived from documentTracking at read time (S3/LPM-9).
+            const uris = new Set(
+                Array.from({ length: index + 1 }, (_, i) => `/file-${config.languageId}-${i}.ext`)
+            );
+            (lspManager as any).documentTracking.set(config.languageId, uris);
         });
 
         const activeServers = lspManager.getActiveServers();
-        
+
         assert.strictEqual(activeServers.length, 2);
         assert.strictEqual(activeServers[0].languageId, 'typescript');
         assert.strictEqual(activeServers[0].documentCount, 1);
@@ -247,14 +252,14 @@ suite('LspProxyManager Test Suite', () => {
         const clientInfo = {
             client: mockLanguageClient,
             config,
-            status: 'running' as const,
-            documentCount: 1
+            status: 'running' as const
         };
 
         (lspManager as any).clients.set('rust', clientInfo);
-        
-        (lspManager as any).handleClientStateChange('rust', { oldState: 2, newState: 3 });
-        
+
+        // State enum (vscode-languageclient): Stopped=1, Running=2, Starting=3.
+        (lspManager as any).handleClientStateChange('rust', { oldState: 2, newState: 1 });
+
         assert.strictEqual(clientInfo.status, 'stopped');
     });
 
@@ -301,10 +306,64 @@ suite('LspProxyManager Test Suite', () => {
         (lspManager as any).clients.set('lua', {
             client: mockLanguageClient,
             config,
-            status: 'running',
-            documentCount: 0
+            status: 'running'
         });
 
         (lspManager as any).handleClientStateChange('lua', { oldState: 1, newState: 2 });
+    });
+
+    test('should not double-start when concurrent opens race (H4)', async () => {
+        const config: LSPServerConfig = {
+            languageId: 'typescript',
+            command: 'typescript-language-server',
+            fileExtensions: ['.ts']
+        };
+        const mockDocument = {
+            uri: { toString: () => '/test/file.ts' },
+            languageId: 'typescript'
+        } as any;
+
+        // A slow start, so the second concurrent call observes the in-flight promise.
+        const startClientStub = sandbox
+            .stub(lspManager as any, 'startClient')
+            .callsFake(() => new Promise<void>(resolve => setTimeout(resolve, 20)));
+
+        await Promise.all([
+            lspManager.ensureClientForConfig(config, mockDocument),
+            lspManager.ensureClientForConfig(config, mockDocument)
+        ]);
+
+        assert.strictEqual(startClientStub.callCount, 1);
+    });
+
+    test('should untrack a closed document and decrement the derived count', () => {
+        const config: LSPServerConfig = {
+            languageId: 'python',
+            command: 'pylsp',
+            fileExtensions: ['.py']
+        };
+
+        (lspManager as any).clients.set('python', {
+            client: mockLanguageClient,
+            config,
+            status: 'running'
+        });
+        (lspManager as any).documentTracking.set('python', new Set(['/a.py', '/b.py']));
+
+        lspManager.untrackDocument('/a.py');
+
+        assert.strictEqual((lspManager as any).documentTracking.get('python').size, 1);
+        assert.strictEqual(lspManager.getActiveServers()[0].documentCount, 1);
+    });
+
+    test('should throw for a tcp config missing tcpPort instead of silently spawning stdio (H2)', () => {
+        const config: LSPServerConfig = {
+            languageId: 'gdscript',
+            command: 'nc',
+            fileExtensions: ['.gd'],
+            transport: 'tcp'
+        };
+
+        assert.throws(() => (lspManager as any).createServerOptions(config, {}));
     });
 });
