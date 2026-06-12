@@ -112,7 +112,7 @@
     "@types/sinon": "^17.0.3",
     "@vscode/test-electron": "^2.3.9",
     "mocha": "^10.2.0",
-    "sinon": "^17.0.1",
+    "sinon": "^22.0.0",
     "glob": "^10.3.10",
     "prettier": "^3.2.4",
     "nyc": "^15.1.0",
