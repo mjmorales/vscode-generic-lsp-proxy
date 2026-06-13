@@ -1,3 +1,25 @@
+# [2.0.0](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v1.0.3...v2.0.0) (2026-06-13)
+
+
+### Bug Fixes
+
+* gate server spawning on Workspace Trust and harden config/lifecycle ([717ed95](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/717ed951078d4983a7a928ae7d6cc8a38b07424e))
+* **test:** avoid macOS test-electron EINVAL with a short user-data-dir ([848ea91](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/848ea91cb082ff3bf78762d2eb16b8176d7f1f32))
+
+
+### BREAKING CHANGES
+
+* the configuration schema changed. The unimplemented `websocket`
+transport and `websocketUrl` field are removed; `transport` is now `stdio | tcp` and a
+`tcp` transport requires an integer `tcpPort` (1..65535) — configs declaring `websocket`
+or a portless `tcp` are now rejected at validation instead of silently spawning stdio.
+The `Custom/Other` template (which wrote placeholder values verbatim) is removed; use the
+interactive Custom Configuration wizard. Disabled-state is now keyed by a stable config id
+(`languageId::command`) rather than `languageId`, so prior workspaceState disabled entries
+do not carry over. The `ws`/`@types/ws` dependencies are dropped.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
 ## [1.0.3](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v1.0.2...v1.0.3) (2025-08-06)
 
 
