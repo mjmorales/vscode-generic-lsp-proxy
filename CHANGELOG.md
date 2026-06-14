@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v2.0.0...v2.1.0) (2026-06-14)
+
+
+### Features
+
+* run multiple language servers per file type ([69e79a9](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/69e79a9edb408e81845fd9e64e961f74487b8246)), closes [#2](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues/2)
+
 # [2.0.0](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v1.0.3...v2.0.0) (2026-06-13)
 
 
