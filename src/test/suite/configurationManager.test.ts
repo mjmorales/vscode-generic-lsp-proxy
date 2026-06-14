@@ -147,8 +147,9 @@ suite('ConfigurationManager Test Suite', () => {
             languageId: 'typescript'
         } as vscode.TextDocument;
 
-        const result = configManager.getConfigForDocument(mockDocument);
-        assert.strictEqual(result?.languageId, 'typescript');
+        const result = configManager.getConfigsForDocument(mockDocument);
+        assert.strictEqual(result.length, 1);
+        assert.strictEqual(result[0].languageId, 'typescript');
     });
 
     test('should get config for document by language ID', () => {
@@ -166,8 +167,56 @@ suite('ConfigurationManager Test Suite', () => {
             languageId: 'rust'
         } as vscode.TextDocument;
 
-        const result = configManager.getConfigForDocument(mockDocument);
-        assert.strictEqual(result?.languageId, 'rust');
+        const result = configManager.getConfigsForDocument(mockDocument);
+        assert.strictEqual(result.length, 1);
+        assert.strictEqual(result[0].languageId, 'rust');
+    });
+
+    test('should return every config matching a document (server + linter on one extension)', () => {
+        const lsp: LSPServerConfig = {
+            id: 'python::pylsp',
+            languageId: 'python',
+            command: 'pylsp',
+            fileExtensions: ['.py']
+        };
+        const linter: LSPServerConfig = {
+            id: 'python::ruff',
+            languageId: 'python',
+            command: 'ruff',
+            fileExtensions: ['.py']
+        };
+
+        (configManager as any).configs = [lsp, linter];
+        (configManager as any).buildMaps();
+
+        const mockDocument = {
+            fileName: '/test/app.py',
+            languageId: 'python'
+        } as vscode.TextDocument;
+
+        const result = configManager.getConfigsForDocument(mockDocument);
+        assert.strictEqual(result.length, 2);
+        assert.deepStrictEqual(result.map(c => c.command).sort(), ['pylsp', 'ruff']);
+    });
+
+    test('should dedup a config that matches by both extension and languageId', () => {
+        const config: LSPServerConfig = {
+            id: 'typescript::typescript-language-server',
+            languageId: 'typescript',
+            command: 'typescript-language-server',
+            fileExtensions: ['.ts']
+        };
+
+        (configManager as any).configs = [config];
+        (configManager as any).buildMaps();
+
+        const mockDocument = {
+            fileName: '/test/file.ts',
+            languageId: 'typescript'
+        } as vscode.TextDocument;
+
+        const result = configManager.getConfigsForDocument(mockDocument);
+        assert.strictEqual(result.length, 1);
     });
 
     test('should respect workspace pattern restrictions', () => {
@@ -191,8 +240,8 @@ suite('ConfigurationManager Test Suite', () => {
             languageId: 'java'
         } as vscode.TextDocument;
 
-        assert.strictEqual(configManager.getConfigForDocument(documentInWorkspace)?.languageId, 'java');
-        assert.strictEqual(configManager.getConfigForDocument(documentOutsideWorkspace), undefined);
+        assert.strictEqual(configManager.getConfigsForDocument(documentInWorkspace)[0]?.languageId, 'java');
+        assert.deepStrictEqual(configManager.getConfigsForDocument(documentOutsideWorkspace), []);
     });
 
     test('should normalize file extensions', () => {

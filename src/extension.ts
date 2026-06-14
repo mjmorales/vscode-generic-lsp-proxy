@@ -101,10 +101,8 @@ async function handleDocumentOpen(document: vscode.TextDocument) {
         return;
     }
 
-    const config = configManager.getConfigForDocument(document);
-    if (config) {
-        await lspManager.ensureClientForConfig(config, document);
-    }
+    const configs = configManager.getConfigsForDocument(document);
+    await Promise.all(configs.map(config => lspManager.ensureClientForConfig(config, document)));
 }
 
 async function handleRestartCommand() {
@@ -114,14 +112,15 @@ async function handleRestartCommand() {
         return;
     }
 
-    const config = configManager.getConfigForDocument(activeEditor.document);
-    if (!config) {
+    const configs = configManager.getConfigsForDocument(activeEditor.document);
+    if (configs.length === 0) {
         vscode.window.showInformationMessage('No LSP configuration found for current file');
         return;
     }
 
-    await lspManager.restartClient(config.id!);
-    vscode.window.showInformationMessage(`Restarted LSP server for ${config.languageId}`);
+    await Promise.all(configs.map(config => lspManager.restartClient(config.id!)));
+    const languageIds = [...new Set(configs.map(c => c.languageId))].join(', ');
+    vscode.window.showInformationMessage(`Restarted ${configs.length} LSP server(s) for ${languageIds}`);
 }
 
 async function handleShowActiveServersCommand() {
@@ -193,8 +192,8 @@ async function handleShowDisabledServersCommand() {
         // Try to start the server for any open documents matching the re-enabled config.
         await Promise.all(
             vscode.workspace.textDocuments.map(doc => {
-                const config = configManager.getConfigForDocument(doc);
-                if (config && config.id === selected.config.id) {
+                const configs = configManager.getConfigsForDocument(doc);
+                if (configs.some(c => c.id === selected.config.id)) {
                     return handleDocumentOpen(doc);
                 }
                 return Promise.resolve();

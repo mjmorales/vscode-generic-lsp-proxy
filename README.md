@@ -223,6 +223,43 @@ interface LSPServerConfig {
 ```
 </details>
 
+<details>
+<summary><strong>Multiple servers on one file type (e.g. language server + linter)</strong></summary>
+
+A single file can be driven by more than one language client. List one entry per
+server that should run for the extension; every matching server is started and
+VS Code merges their results (completions, hovers, diagnostics, definitions, …).
+
+```json
+[
+  {
+    "languageId": "python",
+    "command": "pylsp",
+    "fileExtensions": [".py"]
+  },
+  {
+    "languageId": "python",
+    "command": "ruff",
+    "args": ["server"],
+    "fileExtensions": [".py"]
+  }
+]
+```
+
+Entries are matched independently, so they may differ in `command`, `transport`,
+`args`, or `settings`. Servers are tracked by a stable id (`languageId::command`),
+which is why two entries sharing a `languageId` coexist as long as their commands
+differ. Each server sees the whole file, so a server pointed at a host language
+must tolerate it (e.g. `tailwindcss-language-server` on HTML is fine; a plain CSS
+server on HTML is not).
+
+> **Known limitation:** Call Hierarchy (`textDocument/prepareCallHierarchy`) does
+> not merge across clients in VS Code — if one server returns an empty result
+> before a second returns data, the late result is dropped. This is an upstream
+> VS Code language-client behavior, not something the proxy can resolve.
+
+</details>
+
 ## ⚙️ Extension Settings
 
 Configure the extension behavior in VS Code settings (`Ctrl+,` / `Cmd+,`):

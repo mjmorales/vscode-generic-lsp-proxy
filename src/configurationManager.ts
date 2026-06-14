@@ -37,8 +37,10 @@ export function resolveWithinFolder(folderFsPath: string, p: string): string | u
 
 export class ConfigurationManager {
     private configs: LSPServerConfig[] = [];
-    private fileExtensionMap: Map<string, LSPServerConfig> = new Map();
-    private languageIdMap: Map<string, LSPServerConfig> = new Map();
+    // Multiple configs may register for one extension/languageId (e.g. a language
+    // server alongside a linter); maps hold every match, not a last-wins single.
+    private fileExtensionMap: Map<string, LSPServerConfig[]> = new Map();
+    private languageIdMap: Map<string, LSPServerConfig[]> = new Map();
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -209,74 +211,87 @@ export class ConfigurationManager {
                 this.logger.info(`Skipping disabled configuration for ${config.languageId}`);
                 continue;
             }
-            
-            // last-wins shadowing; warn so collisions are diagnosable.
-            const shadowedByLang = this.languageIdMap.get(config.languageId);
-            if (shadowedByLang) {
-                this.logger.warn(`Multiple configs for languageId '${config.languageId}': '${config.command}' shadows '${shadowedByLang.command}'`);
-            }
-            this.languageIdMap.set(config.languageId, config);
+
+            // Co-registration is intended (multiple clients per file); append rather
+            // than shadow. Log at debug so collisions stay diagnosable.
+            this.appendToMap(this.languageIdMap, config.languageId, config);
 
             for (const ext of config.fileExtensions) {
                 const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
-                const shadowedByExt = this.fileExtensionMap.get(normalizedExt);
-                if (shadowedByExt) {
-                    this.logger.warn(`Multiple configs for extension '${normalizedExt}': '${config.command}' shadows '${shadowedByExt.command}'`);
-                }
-                this.fileExtensionMap.set(normalizedExt, config);
+                this.appendToMap(this.fileExtensionMap, normalizedExt, config);
             }
         }
     }
 
-    getConfigForDocument(document: vscode.TextDocument): LSPServerConfig | undefined {
+    private appendToMap(map: Map<string, LSPServerConfig[]>, key: string, config: LSPServerConfig): void {
+        const existing = map.get(key);
+        if (existing) {
+            this.logger.debug(`Additional config for '${key}': '${config.command}' co-registered`);
+            existing.push(config);
+        } else {
+            map.set(key, [config]);
+        }
+    }
+
+    /**
+     * Every config that matches the document, by extension OR languageId OR
+     * filePattern (union, deduped by stable id). VS Code merges results across
+     * multiple language clients, so a file may legitimately drive several servers.
+     */
+    getConfigsForDocument(document: vscode.TextDocument): LSPServerConfig[] {
         const fileName = document.fileName;
         const ext = path.extname(fileName);
-        
-        let config = this.fileExtensionMap.get(ext);
 
-        if (!config) {
-            config = this.languageIdMap.get(document.languageId);
+        // Dedup by id: a config can match by both extension and languageId.
+        const matched = new Map<string, LSPServerConfig>();
+        const add = (cfg: LSPServerConfig) => {
+            if (this.matchesWorkspacePattern(cfg, fileName)) {
+                matched.set(this.configId(cfg), cfg);
+            }
+        };
+
+        for (const cfg of this.fileExtensionMap.get(ext) ?? []) {
+            add(cfg);
+        }
+        for (const cfg of this.languageIdMap.get(document.languageId) ?? []) {
+            add(cfg);
         }
 
-        if (!config) {
-            for (const cfg of this.configs) {
-                // Skip disabled configurations
-                if (cfg.disabled) continue;
+        for (const cfg of this.configs) {
+            // Skip disabled configs and any already matched by extension/languageId.
+            if (cfg.disabled || matched.has(this.configId(cfg)) || !cfg.filePatterns) continue;
 
-                if (cfg.filePatterns) {
-                    // RelativePattern base must be the WorkspaceFolder object, not the
-                    // workspacePattern string (which is an fsPath/glob, not a folder).
-                    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)
-                        ?? vscode.workspace.workspaceFolders?.[0];
-                    if (!workspaceFolder) continue;
+            // RelativePattern base must be the WorkspaceFolder object, not the
+            // workspacePattern string (which is an fsPath/glob, not a folder).
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)
+                ?? vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) continue;
 
-                    for (const pattern of cfg.filePatterns) {
-                        const globPattern = new vscode.RelativePattern(
-                            workspaceFolder,
-                            pattern
-                        );
-                        if (vscode.languages.match({ pattern: globPattern }, document)) {
-                            config = cfg;
-                            break;
-                        }
-                    }
+            for (const pattern of cfg.filePatterns) {
+                const globPattern = new vscode.RelativePattern(workspaceFolder, pattern);
+                if (vscode.languages.match({ pattern: globPattern }, document)) {
+                    add(cfg);
+                    break;
                 }
-                if (config) break;
             }
         }
 
-        // Scope by workspacePattern only when it is an absolute path prefix;
-        // glob-shaped values (e.g. '**/*') are not path prefixes and must not gate.
-        if (config && config.workspacePattern && path.isAbsolute(config.workspacePattern)
-            && !fileName.startsWith(config.workspacePattern)) {
-            return undefined;
-        }
-
-        return config;
+        return [...matched.values()];
     }
 
-    getConfigByLanguageId(languageId: string): LSPServerConfig | undefined {
-        return this.languageIdMap.get(languageId);
+    /**
+     * Scope by workspacePattern only when it is an absolute path prefix;
+     * glob-shaped values (e.g. '**\/*') are not path prefixes and must not gate.
+     */
+    private matchesWorkspacePattern(config: LSPServerConfig, fileName: string): boolean {
+        if (config.workspacePattern && path.isAbsolute(config.workspacePattern)) {
+            return fileName.startsWith(config.workspacePattern);
+        }
+        return true;
+    }
+
+    getConfigsByLanguageId(languageId: string): LSPServerConfig[] {
+        return this.languageIdMap.get(languageId) ?? [];
     }
 
     getConfigById(id: string): LSPServerConfig | undefined {

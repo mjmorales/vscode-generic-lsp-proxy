@@ -27,8 +27,8 @@ suite('LspProxyManager Test Suite', () => {
 
         mockConfigManager = {
             loadConfiguration: sandbox.stub().resolves(),
-            getConfigForDocument: sandbox.stub(),
-            getConfigByLanguageId: sandbox.stub(),
+            getConfigsForDocument: sandbox.stub().returns([]),
+            getConfigsByLanguageId: sandbox.stub().returns([]),
             getConfigById: sandbox.stub(),
             getAllConfigs: sandbox.stub().returns([])
         } as any;
