@@ -1,6 +1,6 @@
 # Generic LSP Proxy for VS Code
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/vscode-generic-lsp-proxy.generic-lsp-proxy)](https://marketplace.visualstudio.com/items?itemName=vscode-generic-lsp-proxy.generic-lsp-proxy)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/mjmorales.generic-lsp-proxy)](https://marketplace.visualstudio.com/items?itemName=mjmorales.generic-lsp-proxy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/mjmorales/vscode-generic-lsp-proxy/workflows/CI/badge.svg)](https://github.com/mjmorales/vscode-generic-lsp-proxy/actions)
 [![Release](https://github.com/mjmorales/vscode-generic-lsp-proxy/workflows/Release/badge.svg)](https://github.com/mjmorales/vscode-generic-lsp-proxy/releases)
@@ -410,7 +410,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=vscode-generic-lsp-proxy.generic-lsp-proxy)
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mjmorales.generic-lsp-proxy)
 - [GitHub Repository](https://github.com/mjmorales/vscode-generic-lsp-proxy)
 - [Issue Tracker](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues)
 - [Language Server Protocol Specification](https://microsoft.github.io/language-server-protocol/)
