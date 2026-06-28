@@ -13,3 +13,8 @@ updates:
       # 18.x/20.x); major bumps overshoot it and break compilation.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # @types/vscode must match engines.vscode (the minimum VS Code, pinned by
+      # vscode-languageclient). Minor/major bumps exceed it and vsce refuses to
+      # package ("@types/vscode > engines.vscode"). Allow patch only.
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
