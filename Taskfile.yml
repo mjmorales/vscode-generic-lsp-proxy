@@ -69,13 +69,13 @@ tasks:
       - npm run lint
     sources:
       - src/**/*.ts
-      - .eslintrc.json
+      - eslint.config.js
 
   lint:fix:
     desc: Run ESLint and automatically fix issues
     deps: [install]
     cmds:
-      - npx eslint src --ext ts --fix
+      - npx eslint src --fix
 
   typecheck:
     desc: Run TypeScript type checking without emitting files

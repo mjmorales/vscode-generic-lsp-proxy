@@ -12,6 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node16",
+    "types": ["node", "vscode", "mocha", "sinon"],
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "declarationMap": true
