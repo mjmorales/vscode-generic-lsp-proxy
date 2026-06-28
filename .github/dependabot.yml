@@ -8,3 +8,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # @types/node must track the minimum supported Node runtime (CI targets
+      # 18.x/20.x); major bumps overshoot it and break compilation.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
