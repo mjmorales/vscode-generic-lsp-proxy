@@ -114,7 +114,7 @@
     "mocha": "^11.7.6",
     "sinon": "^17.0.1",
     "glob": "^10.3.10",
-    "prettier": "^3.2.4",
+    "prettier": "^3.9.1",
     "nyc": "^15.1.0",
     "typedoc": "^0.28.19",
     "semantic-release": "^23.0.0",
