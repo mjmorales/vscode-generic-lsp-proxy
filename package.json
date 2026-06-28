@@ -113,7 +113,7 @@
     "eslint": "^10.6.0",
     "glob": "^13.0.6",
     "mocha": "^11.7.6",
-    "nyc": "^15.1.0",
+    "nyc": "^18.0.0",
     "prettier": "^3.9.1",
     "semantic-release": "^25.0.5",
     "semantic-release-vsce": "^5.6.4",
