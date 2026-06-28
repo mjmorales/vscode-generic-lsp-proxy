@@ -4,6 +4,7 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     "outDir": "out",
+    "rootDir": "src",
     "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
@@ -11,6 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "declarationMap": true
