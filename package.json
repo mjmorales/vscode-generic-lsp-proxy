@@ -109,7 +109,7 @@
     "@types/node": "^20.11.0",
     "@types/sinon": "^17.0.3",
     "@types/vscode": "~1.91.0",
-    "@vscode/test-electron": "^2.3.9",
+    "@vscode/test-electron": "^3.0.0",
     "eslint": "^10.6.0",
     "glob": "^13.0.6",
     "mocha": "^11.7.6",
