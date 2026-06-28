@@ -96,7 +96,7 @@ suite('Extension Test Suite', () => {
             // Clean up config file
             try {
                 await fs.promises.unlink(configPath);
-            } catch (e) {
+            } catch {
                 // Ignore if file doesn't exist
             }
         }
