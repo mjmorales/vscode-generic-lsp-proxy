@@ -396,7 +396,7 @@ suite('loadConfiguration (configPath scope, #18)', () => {
             show: sandbox.stub(), dispose: sandbox.stub()
         };
         mockContext = {
-            // Points at a non-existent dir so the globalStorage config is skipped.
+            // No global config here, so the count assertions stay isolated.
             globalStorageUri: { fsPath: path.join(baseDir, 'no-global-storage') },
             subscriptions: [],
             workspaceState: { get: sandbox.stub().returns([]), update: sandbox.stub().resolves() }
@@ -452,7 +452,6 @@ suite('loadConfiguration (configPath scope, #18)', () => {
 
         await configManager.loadConfiguration();
 
-        // Dedup keeps the workspace-independent absolute path from loading per-folder.
         assert.strictEqual(configManager.getAllConfigs().length, 1);
     });
 });
