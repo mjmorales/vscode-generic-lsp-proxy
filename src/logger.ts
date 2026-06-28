@@ -11,11 +11,11 @@ const LOG_LEVEL_SEVERITY: Record<LogLevel, number> = {
 };
 
 export class Logger {
-    private outputChannel: vscode.OutputChannel;
+    private outputChannel: vscode.LogOutputChannel;
     private debugEnabled: boolean;
 
     constructor(name: string) {
-        this.outputChannel = vscode.window.createOutputChannel(name);
+        this.outputChannel = vscode.window.createOutputChannel(name, { log: true });
         this.debugEnabled = vscode.workspace.getConfiguration('genericLspProxy').get<boolean>('enableDebugLogging', false);
     }
 
@@ -57,7 +57,7 @@ export class Logger {
     }
 
     // The channel is borrowed by LanguageClient; the Logger retains disposal ownership.
-    getOutputChannel(): vscode.OutputChannel {
+    getOutputChannel(): vscode.LogOutputChannel {
         return this.outputChannel;
     }
 
