@@ -41,7 +41,8 @@ const mockVscode = {
         getConfiguration: () => ({
             get: (_key: string, defaultValue?: unknown) => defaultValue,
             has: () => false,
-            update: () => Promise.resolve()
+            update: () => Promise.resolve(),
+            inspect: () => undefined
         }),
         workspaceFolders: [] as unknown[],
         getWorkspaceFolder: () => undefined,

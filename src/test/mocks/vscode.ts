@@ -55,6 +55,14 @@ export class MockWorkspaceConfiguration {
         return this.values.has(section);
     }
 
+    // Provided values are treated as user/profile-scoped (globalValue) — i.e. trusted.
+    inspect<T>(section: string): { key: string; defaultValue?: T; globalValue?: T; workspaceValue?: T; workspaceFolderValue?: T } | undefined {
+        if (!this.values.has(section)) {
+            return undefined;
+        }
+        return { key: section, globalValue: this.values.get(section) as T };
+    }
+
     update(section: string, value: any): Thenable<void> {
         this.values.set(section, value);
         return Promise.resolve();

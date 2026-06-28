@@ -2,8 +2,10 @@ import assert from 'assert';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { ConfigurationManager, LSPServerConfig, resolveWithinFolder } from '../../configurationManager';
+import { MockWorkspaceFolder } from '../mocks/vscode';
 
 suite('ConfigurationManager Test Suite', () => {
     let configManager: ConfigurationManager;
@@ -351,6 +353,106 @@ suite('ConfigurationManager Test Suite', () => {
         } finally {
             await fs.promises.unlink(tempFile).catch(() => {});
         }
+    });
+});
+
+suite('loadConfiguration (configPath scope, #18)', () => {
+    // `fs.existsSync` is non-configurable and cannot be stubbed, so these exercise the real
+    // filesystem with temp dirs (mirrors the dual-python test above).
+    let configManager: ConfigurationManager;
+    let mockContext: any;
+    let mockLogger: any;
+    let sandbox: sinon.SinonSandbox;
+    let baseDir: string;
+    let userPath: string;
+
+    const validConfigJson = JSON.stringify({
+        languageId: 'nix',
+        command: 'nil',
+        fileExtensions: ['.nix']
+    });
+
+    const stubConfigScope = (inspectResult: unknown) => {
+        sandbox.stub(vscode.workspace, 'getConfiguration').returns({
+            get: (_key: string, defaultValue?: unknown) => defaultValue,
+            has: () => false,
+            update: () => Promise.resolve(),
+            inspect: () => inspectResult
+        } as any);
+    };
+
+    const escapesError = () =>
+        mockLogger.error.getCalls().some((c: any) => String(c.args[0]).includes('escapes workspace folder'));
+
+    setup(() => {
+        sandbox = sinon.createSandbox();
+        baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lsp-proxy-test-'));
+        userPath = path.join(baseDir, 'user-config.json');
+        fs.writeFileSync(userPath, validConfigJson);
+
+        mockLogger = {
+            info: sandbox.stub(), warn: sandbox.stub(), error: sandbox.stub(),
+            debug: sandbox.stub(), setDebugEnabled: sandbox.stub(),
+            show: sandbox.stub(), dispose: sandbox.stub()
+        };
+        mockContext = {
+            // No global config here, so the count assertions stay isolated.
+            globalStorageUri: { fsPath: path.join(baseDir, 'no-global-storage') },
+            subscriptions: [],
+            workspaceState: { get: sandbox.stub().returns([]), update: sandbox.stub().resolves() }
+        };
+        configManager = new ConfigurationManager(mockContext, mockLogger as any);
+    });
+
+    teardown(() => {
+        sandbox.restore();
+        fs.rmSync(baseDir, { recursive: true, force: true });
+    });
+
+    const makeFolder = (name: string, index = 0) => {
+        const dir = path.join(baseDir, name);
+        fs.mkdirSync(dir, { recursive: true });
+        return new MockWorkspaceFolder(dir, name, index);
+    };
+
+    test('user/profile-scoped absolute configPath is trusted and loaded', async () => {
+        sandbox.stub(vscode.workspace, 'workspaceFolders').value([makeFolder('app')]);
+        stubConfigScope({ key: 'genericLspProxy.configPath', defaultValue: '.vscode/lsp-proxy.json', globalValue: userPath });
+
+        await configManager.loadConfiguration();
+
+        assert.strictEqual(configManager.getAllConfigs().length, 1);
+        assert.strictEqual(configManager.getConfigById('nix::nil')?.command, 'nil');
+        assert.strictEqual(escapesError(), false);
+    });
+
+    test('workspace-scoped absolute configPath is rejected by the containment guard', async () => {
+        sandbox.stub(vscode.workspace, 'workspaceFolders').value([makeFolder('app')]);
+        stubConfigScope({ key: 'genericLspProxy.configPath', defaultValue: '.vscode/lsp-proxy.json', workspaceValue: userPath });
+
+        await configManager.loadConfiguration();
+
+        assert.strictEqual(configManager.getAllConfigs().length, 0);
+        assert.strictEqual(escapesError(), true);
+    });
+
+    test('workspace-scoped parent-escape configPath is rejected', async () => {
+        sandbox.stub(vscode.workspace, 'workspaceFolders').value([makeFolder('app')]);
+        stubConfigScope({ key: 'genericLspProxy.configPath', defaultValue: '.vscode/lsp-proxy.json', workspaceValue: '../user-config.json' });
+
+        await configManager.loadConfiguration();
+
+        assert.strictEqual(configManager.getAllConfigs().length, 0);
+        assert.strictEqual(escapesError(), true);
+    });
+
+    test('user-scoped absolute configPath in a multi-root workspace loads once', async () => {
+        sandbox.stub(vscode.workspace, 'workspaceFolders').value([makeFolder('a', 0), makeFolder('b', 1)]);
+        stubConfigScope({ key: 'genericLspProxy.configPath', defaultValue: '.vscode/lsp-proxy.json', globalValue: userPath });
+
+        await configManager.loadConfiguration();
+
+        assert.strictEqual(configManager.getAllConfigs().length, 1);
     });
 });
 
