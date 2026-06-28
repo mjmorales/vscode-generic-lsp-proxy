@@ -55,6 +55,19 @@ jobs:
       run: npm test
       if: matrix.os != 'ubuntu-latest'
 
+  # Single stable status context for branch-protection gating: the test matrix
+  # produces brittle per-leg contexts, so the main ruleset requires this instead.
+  # Runs on PRs (always()) and reports success only if lint and test both passed,
+  # so Dependabot auto-merge lands only on green CI.
+  gate:
+    if: always()
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Require lint and test to have passed
+      run: |
+        [ "${{ needs.lint.result }}" = "success" ] && [ "${{ needs.test.result }}" = "success" ]
+
   package:
     runs-on: ubuntu-latest
     needs: test
