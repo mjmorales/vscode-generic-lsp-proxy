@@ -23,8 +23,9 @@ export interface LSPServerConfig {
 /**
  * Resolve `p` against `folderFsPath`, returning the absolute path only if it stays
  * within `folderFsPath`. Returns `undefined` for inputs that escape the folder (via `..`)
- * or are absolute. `configPath` is workspace-controlled (untrusted in unverified repos),
- * so this guards path-traversal out of the workspace.
+ * or are absolute. Applied only to a *workspace/folder-scoped* `configPath` (untrusted in
+ * unverified repos), so this guards path-traversal out of the workspace. A user/profile-scoped
+ * value is set by the user, not the repo, and bypasses this guard (see `loadConfiguration`).
  */
 export function resolveWithinFolder(folderFsPath: string, p: string): string | undefined {
     const resolved = path.resolve(folderFsPath, p);
@@ -58,10 +59,35 @@ export class ConfigurationManager {
             return;
         }
 
-        const configPath = vscode.workspace.getConfiguration('genericLspProxy').get<string>('configPath', '.vscode/lsp-proxy.json');
-
+        // A user/profile-scoped (or default) `configPath` is set by the user and is trusted:
+        // absolute paths and `..` are honored, and an absolute one is workspace-independent
+        // (loaded once, applied across all folders). A workspace/folder-scoped value is
+        // repo-controlled and stays subject to the path-containment guard (CFG-5), since an
+        // unverified repo could otherwise point it outside the workspace. Scope is read via
+        // inspect() per folder so multi-root overrides are honored.
+        const loadedAbsolute = new Set<string>();
         for (const folder of workspaceFolders) {
-            await this.loadConfigFromWorkspace(folder, configPath);
+            const inspected = vscode.workspace
+                .getConfiguration('genericLspProxy', folder.uri)
+                .inspect<string>('configPath');
+            const configPath = inspected?.workspaceFolderValue
+                ?? inspected?.workspaceValue
+                ?? inspected?.globalValue
+                ?? inspected?.defaultValue
+                ?? '.vscode/lsp-proxy.json';
+            const trusted = inspected?.workspaceFolderValue === undefined
+                && inspected?.workspaceValue === undefined;
+
+            if (trusted && path.isAbsolute(configPath)) {
+                // Workspace-independent; load once even across multiple folders.
+                if (!loadedAbsolute.has(configPath)) {
+                    loadedAbsolute.add(configPath);
+                    await this.loadTrustedConfig(configPath);
+                }
+                continue;
+            }
+
+            await this.loadConfigFromWorkspace(folder, configPath, trusted);
         }
 
         await this.loadGlobalConfig();
@@ -77,8 +103,12 @@ export class ConfigurationManager {
         this.logger.info(`Loaded ${this.configs.length} LSP configurations`);
     }
 
-    private async loadConfigFromWorkspace(folder: vscode.WorkspaceFolder, configPath: string): Promise<void> {
-        const absolutePath = resolveWithinFolder(folder.uri.fsPath, configPath);
+    private async loadConfigFromWorkspace(folder: vscode.WorkspaceFolder, configPath: string, trusted: boolean): Promise<void> {
+        // Trusted (user/profile/default) values resolve plainly; untrusted (repo-supplied)
+        // values stay within the folder via the containment guard.
+        const absolutePath = trusted
+            ? path.resolve(folder.uri.fsPath, configPath)
+            : resolveWithinFolder(folder.uri.fsPath, configPath);
         if (absolutePath === undefined) {
             this.logger.error(`Invalid configPath "${configPath}": escapes workspace folder ${folder.uri.fsPath}; skipping`);
             return;
@@ -123,6 +153,19 @@ export class ConfigurationManager {
             }
         } catch (error) {
             this.logger.error(`Failed to load config from ${filePath}: ${error}`);
+        }
+    }
+
+    /**
+     * Load a user/profile-scoped absolute `configPath`. It is workspace-independent, so it is
+     * loaded once with no folder binding (its configs apply across all workspace folders).
+     * A missing file is a warning, not an error — the user may not have created it yet.
+     */
+    private async loadTrustedConfig(absolutePath: string): Promise<void> {
+        if (fs.existsSync(absolutePath)) {
+            await this.loadConfigFile(absolutePath);
+        } else {
+            this.logger.warn(`configPath "${absolutePath}" not found; skipping`);
         }
     }
 

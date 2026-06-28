@@ -94,11 +94,28 @@ Open any file matching your configured extensions. The LSP will start automatica
 
 ### Configuration File Locations
 
-The extension looks for configuration in the following order:
+For every workspace folder the extension loads, in order:
 
-1. `.vscode/lsp-proxy.json` (workspace-specific)
-2. `.lsp-proxy.json` (project root)
-3. Global configuration in VS Code settings
+1. The path in the `genericLspProxy.configPath` setting (default `.vscode/lsp-proxy.json`).
+2. `.lsp-proxy.json` in the folder root — only as a fallback when the `configPath` file does not exist.
+
+It then always also loads a **global** config file shared across all open folders:
+
+3. `lsp-proxy.json` in the extension's `globalStorage` directory. This location is per VS Code profile; its filesystem path is shown in the extension's output channel on load. Use it for servers you want available in every workspace.
+
+#### `configPath` scope and trust
+
+`genericLspProxy.configPath` is read with VS Code's setting scopes, and its scope changes how the value is resolved:
+
+- **Workspace / folder scope** (`.vscode/settings.json`, `*.code-workspace`): the value is repo-controlled and treated as untrusted. It is resolved **relative to the workspace folder** and must stay **inside** it — an absolute path or a `..` escape is rejected (logged as `Invalid configPath … escapes workspace folder … skipping`). This prevents an unverified repository from pointing the extension at an arbitrary file.
+- **User / profile scope** (your User `settings.json`): the value is set by you and is trusted. An **absolute path is allowed** and is loaded once, independent of any workspace folder — set it here to share one config across workspaces or to keep a per-profile config (e.g. a Nix-generated path). A relative user-scoped value is resolved per folder without the containment restriction.
+
+```jsonc
+// User settings.json — absolute path, shared across all workspaces / per profile
+{
+  "genericLspProxy.configPath": "/path/to/generic-lsp-proxy.json"
+}
+```
 
 ### Configuration Schema
 
@@ -266,7 +283,7 @@ Configure the extension behavior in VS Code settings (`Ctrl+,` / `Cmd+,`):
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `genericLspProxy.configPath` | string | `.vscode/lsp-proxy.json` | Path to configuration file |
+| `genericLspProxy.configPath` | string | `.vscode/lsp-proxy.json` | Path to configuration file. Workspace-scoped values must stay inside the folder; user/profile-scoped values may be absolute. See [`configPath` scope and trust](#configpath-scope-and-trust). |
 | `genericLspProxy.enableDebugLogging` | boolean | `false` | Enable detailed logging |
 
 ## 📟 Commands
@@ -377,6 +394,7 @@ task format
 | "Connection refused" | For TCP, ensure server is running on specified port |
 | "Invalid configuration" | Check JSON syntax and required fields |
 | "Server stopped" | Check server logs and restart manually |
+| "Invalid configPath … escapes workspace folder" | A workspace-scoped `configPath` must stay inside the folder. To use an absolute path, set `genericLspProxy.configPath` in your **User** settings instead of workspace settings — see [`configPath` scope and trust](#configpath-scope-and-trust). |
 
 ## 🤝 Contributing
 
