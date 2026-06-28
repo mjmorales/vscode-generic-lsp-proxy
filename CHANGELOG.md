@@ -1,3 +1,11 @@
+## [2.1.1](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v2.1.0...v2.1.1) (2026-06-28)
+
+
+### Bug Fixes
+
+* **config:** trust user/profile-scoped configPath, allow absolute paths ([#18](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues/18)) ([#26](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues/26)) ([4e51690](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/4e516900a2ce2b22a47ec6c9a0abfd5e3f8d2746))
+* **deps:** pin @types/vscode to the engines.vscode floor (1.91) ([6442b26](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/6442b265ab5acd403b53d80525095c3996ad1387))
+
 # [2.1.0](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v2.0.0...v2.1.0) (2026-06-14)
 
 
