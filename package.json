@@ -119,7 +119,7 @@
     "semantic-release-vsce": "^6.1.6",
     "sinon": "^22.1.0",
     "typedoc": "^0.28.20",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "typescript-eslint": "^8.64.0"
   }
 }
