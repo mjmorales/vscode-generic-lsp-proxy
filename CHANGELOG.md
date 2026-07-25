@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v2.1.1...v2.1.2) (2026-07-25)
+
+
+### Bug Fixes
+
+* stop injecting --stdio into user-configured server args ([#47](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues/47)) ([6a36a0c](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/6a36a0c5c363318aadb246577f37fe0beefbf1df)), closes [#42](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues/42)
+
 ## [2.1.1](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v2.1.0...v2.1.1) (2026-06-28)
 
 
