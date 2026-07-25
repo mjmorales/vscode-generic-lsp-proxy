@@ -273,9 +273,36 @@ suite('LspProxyManager Test Suite', () => {
         };
 
         const serverOptions = (lspManager as any).createServerOptions(config);
-        
+
         assert.strictEqual(serverOptions.command, 'pylsp');
         assert.deepStrictEqual(serverOptions.args, ['--verbose']);
+    });
+
+    test('should pass args through verbatim without injecting --stdio (#42)', () => {
+        const config: LSPServerConfig = {
+            languageId: 'python',
+            command: 'jedi-language-server',
+            fileExtensions: ['.py', '.pyw'],
+            args: []
+        };
+
+        const serverOptions = (lspManager as any).createServerOptions(config);
+
+        assert.deepStrictEqual(serverOptions.args, []);
+        assert.strictEqual(serverOptions.transport, undefined);
+    });
+
+    test('should not inject --stdio into a config that omits args (#42)', () => {
+        const config: LSPServerConfig = {
+            languageId: 'ruby',
+            command: 'solargraph',
+            fileExtensions: ['.rb']
+        };
+
+        const serverOptions = (lspManager as any).createServerOptions(config);
+
+        assert.deepStrictEqual(serverOptions.args, []);
+        assert.strictEqual(serverOptions.transport, undefined);
     });
 
     test('should create server options for tcp transport', () => {

@@ -3,7 +3,6 @@ import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
-    TransportKind,
     StreamInfo,
     State,
     StateChangeEvent
@@ -211,8 +210,7 @@ export class LspProxyManager extends EventEmitter {
                 // is only reached for trusted workspaces, where running config.command is
                 // the extension's intended behavior.
                 shell: process.platform === 'win32'
-            },
-            transport: TransportKind.stdio
+            }
         };
     }
 
