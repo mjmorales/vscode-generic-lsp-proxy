@@ -104,7 +104,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@semantic-release/changelog": "^7.0.0",
-    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/git": "^11.0.1",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.19.43",
     "@types/sinon": "^22.0.0",
