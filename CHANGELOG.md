@@ -1,3 +1,10 @@
+## [2.1.3](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v2.1.2...v2.1.3) (2026-08-30)
+
+
+### Bug Fixes
+
+* stop restarting servers that die before initialization ([#58](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues/58)) ([#62](https://github.com/mjmorales/vscode-generic-lsp-proxy/issues/62)) ([0887555](https://github.com/mjmorales/vscode-generic-lsp-proxy/commit/0887555fa0815a51b51fb2e168cd855e538db793))
+
 ## [2.1.2](https://github.com/mjmorales/vscode-generic-lsp-proxy/compare/v2.1.1...v2.1.2) (2026-07-25)
 
 
