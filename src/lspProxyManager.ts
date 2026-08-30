@@ -1,7 +1,13 @@
 import * as vscode from 'vscode';
 import {
+    CloseAction,
+    CloseHandlerResult,
+    ErrorAction,
+    ErrorHandler,
+    ErrorHandlerResult,
     LanguageClient,
     LanguageClientOptions,
+    Message,
     ServerOptions,
     StreamInfo,
     State,
@@ -14,6 +20,57 @@ import { EventEmitter } from 'events';
 
 /** Connection timeout (ms) for the tcp transport. */
 const TCP_CONNECT_TIMEOUT_MS = 10000;
+
+/**
+ * Restart policy for a proxied server (#58).
+ *
+ * vscode-languageclient's default handler restarts a server whose connection closes (up to
+ * 4 times in 3 minutes) whether or not the server ever finished starting. A misconfigured
+ * command — a CLI entry point instead of the language server (`basedpyright` vs
+ * `basedpyright-langserver`), a missing `--stdio`, a bad path — dies during `initialize`,
+ * `start()` rejects and the manager drops the client, but the library keeps re-spawning it
+ * in the background. Every attempt fails identically and each state change lands on a client
+ * the manager no longer tracks. This handler refuses to restart a server that has never
+ * reached State.Running and defers to the library's default policy once it has.
+ */
+export class StartupAwareErrorHandler implements ErrorHandler {
+    private everRan = false;
+    /** The library's default policy. Needs the client, so it is assigned after construction. */
+    delegate?: ErrorHandler;
+
+    constructor(private readonly id: string, private readonly config: LSPServerConfig) {}
+
+    /** The client reached State.Running: from here on, closes are ordinary crashes. */
+    markRunning(): void {
+        this.everRan = true;
+    }
+
+    error(error: Error, message: Message | undefined, count: number | undefined): ErrorHandlerResult | Promise<ErrorHandlerResult> {
+        return this.delegate?.error(error, message, count) ?? { action: ErrorAction.Shutdown };
+    }
+
+    closed(): CloseHandlerResult | Promise<CloseHandlerResult> {
+        if (this.everRan && this.delegate) {
+            return this.delegate.closed();
+        }
+        // No `handled`: the library logs the message to the output channel and shows it as a
+        // notification with a "Go to output" action, which is exactly the surfacing we want.
+        return { action: CloseAction.DoNotRestart, message: startupCrashMessage(this.id, this.config) };
+    }
+}
+
+/** Actionable text for a server that went away before completing the LSP handshake. */
+export function startupCrashMessage(id: string, config: LSPServerConfig): string {
+    const lead = `LSP Proxy: ${id} exited before finishing initialization and will not be restarted.`;
+    if (config.transport === 'tcp') {
+        return `${lead} Check that a language server is listening on ` +
+            `${config.tcpHost ?? '127.0.0.1'}:${config.tcpPort} and speaks LSP on that socket.`;
+    }
+    const commandLine = [config.command, ...(config.args ?? [])].join(' ');
+    return `${lead} Check that \`${commandLine}\` starts a language server speaking LSP over stdio: ` +
+        `the command must be the server entry point (e.g. \`pyright-langserver\`, not the \`pyright\` CLI) ` +
+        `and most servers need an explicit "--stdio" argument. Anything the process wrote to stderr is in the output panel.`;
+}
 
 interface ClientInfo {
     client: LanguageClient;
@@ -88,7 +145,8 @@ export class LspProxyManager extends EventEmitter {
             const socketHolder: { socket?: net.Socket } = {};
             const serverOptions = this.createServerOptions(config, socketHolder);
             const watcher = this.createFileEventsWatcher(config);
-            const clientOptions = this.createClientOptions(config, watcher);
+            const errorHandler = new StartupAwareErrorHandler(id, config);
+            const clientOptions = this.createClientOptions(config, watcher, errorHandler);
 
             const client = new LanguageClient(
                 `generic-lsp-proxy-${config.languageId}`,
@@ -96,6 +154,7 @@ export class LspProxyManager extends EventEmitter {
                 serverOptions,
                 clientOptions
             );
+            errorHandler.delegate = client.createDefaultErrorHandler();
 
             clientInfo = {
                 client,
@@ -107,7 +166,10 @@ export class LspProxyManager extends EventEmitter {
             this.clients.set(id, clientInfo);
 
             client.onDidChangeState(event => {
-                this.handleClientStateChange(id, event);
+                if (event.newState === State.Running) {
+                    errorHandler.markRunning();
+                }
+                this.handleClientStateChange(id, client, event);
             });
 
             await client.start();
@@ -227,7 +289,8 @@ export class LspProxyManager extends EventEmitter {
 
     private createClientOptions(
         config: LSPServerConfig,
-        watcher: vscode.FileSystemWatcher
+        watcher: vscode.FileSystemWatcher,
+        errorHandler: ErrorHandler
     ): LanguageClientOptions {
         const documentSelector = [
             ...config.fileExtensions.map(ext => ({
@@ -250,6 +313,12 @@ export class LspProxyManager extends EventEmitter {
             },
             initializationOptions: config.initializationOptions,
             outputChannel: this.logger.getOutputChannel(),
+            errorHandler,
+            // Without this the library pops the raw transport error ("Pending response rejected
+            // since connection got disposed") as its own notification before start() rejects.
+            // Returning false keeps the library's stop-and-reject path; the error still reaches
+            // startClient's catch and the "couldn't create connection" notification (#58).
+            initializationFailedHandler: () => false,
             middleware: {
                 provideCompletionItem: async (document, position, context, token, next) => {
                     this.logger.debug(`Completion requested for ${document.uri.toString()}`);
@@ -272,10 +341,12 @@ export class LspProxyManager extends EventEmitter {
         return clientOptions;
     }
 
-    private handleClientStateChange(id: string, event: StateChangeEvent): void {
+    private handleClientStateChange(id: string, client: LanguageClient, event: StateChangeEvent): void {
         const clientInfo = this.clients.get(id);
-        if (!clientInfo) {
-            this.logger.warn(`No client info found for ${id} during state change`);
+        if (!clientInfo || clientInfo.client !== client) {
+            // A client that failed to start (and was dropped from the map) or was replaced by a
+            // restart can still report state while it winds down; that is not ours to act on (#58).
+            this.logger.debug(`Ignoring state change from an untracked client for ${id}`);
             return;
         }
 
