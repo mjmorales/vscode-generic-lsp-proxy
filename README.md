@@ -372,6 +372,29 @@ task format
 2. **Verify Installation**: `which <command>` should return the path
 3. **Test Manually**: Run `<command> --version` in terminal
 4. **Check Configuration**: Ensure JSON is valid and paths are correct
+5. **Use the server entry point, not the CLI**: many packages ship a command-line checker *and* a
+   language server under different names. The checker runs once, prints a report and exits — it never
+   speaks LSP. Examples:
+
+   | Package | CLI (wrong) | Language server (right) |
+   |---------|-------------|-------------------------|
+   | `pyright` | `pyright` | `pyright-langserver --stdio` |
+   | `basedpyright` | `basedpyright` | `basedpyright-langserver --stdio` |
+   | `ruff` | `ruff check` | `ruff server` |
+   | `typescript-language-server` | `tsc` | `typescript-language-server --stdio` |
+
+6. **Pass `--stdio` yourself**: `args` are handed to the server verbatim (nothing is injected), so a
+   server that needs a `--stdio` flag must list it in `args`.
+
+A server that exits during the handshake is **not** restarted; the output panel shows
+`exited before finishing initialization` together with whatever the process printed to stderr.
+Fix the `command`/`args`, then run **LSP Proxy: Reload LSP Configuration** (or reopen the file).
+
+#### Windows
+
+Servers installed with `npm install -g` are `.cmd` shims. The extension spawns through the shell, so
+the bare name (`basedpyright-langserver`) resolves via `PATH`; if you use an absolute path instead,
+escape backslashes in JSON (`"C:\\Users\\me\\AppData\\Roaming\\npm\\basedpyright-langserver"`).
 
 ### No IntelliSense/Completions
 
@@ -394,6 +417,7 @@ task format
 | "Connection refused" | For TCP, ensure server is running on specified port |
 | "Invalid configuration" | Check JSON syntax and required fields |
 | "Server stopped" | Check server logs and restart manually |
+| "exited before finishing initialization" / "Pending response rejected since connection got disposed" / "Server process exited with code 1" | The process died during the LSP handshake. Almost always the wrong binary (a CLI checker such as `basedpyright` instead of `basedpyright-langserver`) or a missing `--stdio` in `args` — see [Server Not Starting](#server-not-starting). |
 | "Invalid configPath … escapes workspace folder" | A workspace-scoped `configPath` must stay inside the folder. To use an absolute path, set `genericLspProxy.configPath` in your **User** settings instead of workspace settings — see [`configPath` scope and trust](#configpath-scope-and-trust). |
 
 ## 🤝 Contributing
