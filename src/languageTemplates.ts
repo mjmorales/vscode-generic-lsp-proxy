@@ -112,6 +112,29 @@ export const languageTemplates: LanguageTemplate[] = [
         }
     },
     {
+        name: 'Python (basedpyright)',
+        description: 'basedpyright - Pyright fork with stricter checks and extra features',
+        install: { command: 'npm install -g basedpyright' },
+        config: {
+            languageId: 'python',
+            // The package's `basedpyright` bin is the CLI type checker, which runs a check and
+            // exits; the language server is this separate entry point (#58).
+            command: 'basedpyright-langserver',
+            args: ['--stdio'],
+            fileExtensions: ['.py', '.pyw'],
+            settings: {
+                basedpyright: {
+                    analysis: {
+                        autoImportCompletions: true,
+                        autoSearchPaths: true,
+                        diagnosticMode: 'openFilesOnly',
+                        useLibraryCodeForTypes: true
+                    }
+                }
+            }
+        }
+    },
+    {
         name: 'Rust',
         description: 'Rust Analyzer - official Rust language server',
         install: { command: 'rustup component add rust-analyzer' },
