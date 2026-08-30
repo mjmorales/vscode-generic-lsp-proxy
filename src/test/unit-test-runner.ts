@@ -95,9 +95,18 @@ const mockLanguageClient = {
         onDidChangeState() {
             return { dispose: () => {} };
         }
+        createDefaultErrorHandler() {
+            return {
+                error: () => ({ action: 1 }),
+                closed: () => ({ action: 2 })
+            };
+        }
     },
     TransportKind: { stdio: 0, ipc: 1, pipe: 2, socket: 3 },
-    State: { Stopped: 1, Running: 2, Starting: 3 }
+    State: { Stopped: 1, Running: 2, Starting: 3, StartFailed: 4 },
+    // Must match the real enums: ErrorAction Continue=1/Shutdown=2, CloseAction DoNotRestart=1/Restart=2.
+    ErrorAction: { Continue: 1, Shutdown: 2 },
+    CloseAction: { DoNotRestart: 1, Restart: 2 }
 };
 
 interface MockableModule {

@@ -1,9 +1,9 @@
 import assert from 'assert';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
-import { LspProxyManager } from '../../lspProxyManager';
+import { LspProxyManager, StartupAwareErrorHandler } from '../../lspProxyManager';
 import { ConfigurationManager, LSPServerConfig } from '../../configurationManager';
-import { LanguageClient } from 'vscode-languageclient/node';
+import { CloseAction, ErrorAction, LanguageClient } from 'vscode-languageclient/node';
 
 suite('LspProxyManager Test Suite', () => {
     let lspManager: LspProxyManager;
@@ -22,7 +22,8 @@ suite('LspProxyManager Test Suite', () => {
             debug: sandbox.stub(),
             setDebugEnabled: sandbox.stub(),
             show: sandbox.stub(),
-            dispose: sandbox.stub()
+            dispose: sandbox.stub(),
+            getOutputChannel: sandbox.stub().returns({})
         };
 
         mockConfigManager = {
@@ -37,7 +38,11 @@ suite('LspProxyManager Test Suite', () => {
             start: sandbox.stub().resolves(),
             stop: sandbox.stub().resolves(),
             needsStop: sandbox.stub().returns(true),
-            onDidChangeState: sandbox.stub()
+            onDidChangeState: sandbox.stub(),
+            createDefaultErrorHandler: sandbox.stub().returns({
+                error: () => ({ action: ErrorAction.Continue }),
+                closed: () => ({ action: CloseAction.Restart })
+            })
         } as any;
 
         sandbox.stub(vscode.workspace, 'getConfiguration').returns({
@@ -237,9 +242,103 @@ suite('LspProxyManager Test Suite', () => {
 
         (lspManager as any).clients.set('java', clientInfo);
         
-        (lspManager as any).handleClientStateChange('java', { oldState: 1, newState: 2 });
+        (lspManager as any).handleClientStateChange('java', mockLanguageClient, { oldState: 1, newState: 2 });
         
         assert.strictEqual(clientInfo.status, 'running');
+    });
+
+    test('should ignore state changes from a client it no longer tracks (#58)', () => {
+        const config: LSPServerConfig = {
+            languageId: 'python',
+            command: 'basedpyright',
+            fileExtensions: ['.py']
+        };
+
+        // The tracked client is a fresh instance; the event comes from a superseded one.
+        const clientInfo = {
+            client: mockLanguageClient,
+            config,
+            status: 'starting' as const
+        };
+        (lspManager as any).clients.set('python', clientInfo);
+        const staleClient = {} as LanguageClient;
+
+        (lspManager as any).handleClientStateChange('python', staleClient, { oldState: 3, newState: 2 });
+
+        assert.strictEqual(clientInfo.status, 'starting');
+        assert(mockLogger.warn.notCalled);
+        assert(mockLogger.debug.calledOnce);
+    });
+
+    test('should not restart a server that exits before its first successful start (#58)', () => {
+        const config: LSPServerConfig = {
+            languageId: 'python',
+            command: 'basedpyright',
+            args: ['--verbose'],
+            fileExtensions: ['.py']
+        };
+        const handler = new StartupAwareErrorHandler('python::basedpyright', config);
+        const delegateClosed = sandbox.stub().returns({ action: CloseAction.Restart });
+        handler.delegate = { error: () => ({ action: ErrorAction.Continue }), closed: delegateClosed };
+
+        const result = handler.closed() as { action: CloseAction; message?: string };
+
+        assert.strictEqual(result.action, CloseAction.DoNotRestart);
+        assert(delegateClosed.notCalled);
+        assert(result.message?.includes('python::basedpyright'));
+        assert(result.message?.includes('basedpyright --verbose'));
+        assert(result.message?.includes('--stdio'));
+    });
+
+    test('should defer to the default restart policy once the server has run (#58)', () => {
+        const config: LSPServerConfig = {
+            languageId: 'python',
+            command: 'basedpyright-langserver',
+            args: ['--stdio'],
+            fileExtensions: ['.py']
+        };
+        const handler = new StartupAwareErrorHandler('python::basedpyright-langserver', config);
+        const delegateClosed = sandbox.stub().returns({ action: CloseAction.Restart });
+        handler.delegate = { error: () => ({ action: ErrorAction.Continue }), closed: delegateClosed };
+
+        handler.markRunning();
+        const result = handler.closed() as { action: CloseAction };
+
+        assert.strictEqual(result.action, CloseAction.Restart);
+        assert(delegateClosed.calledOnce);
+    });
+
+    test('should describe the socket, not --stdio, for a tcp server that closes during startup (#58)', () => {
+        const config: LSPServerConfig = {
+            languageId: 'gdscript',
+            command: 'nc',
+            fileExtensions: ['.gd'],
+            transport: 'tcp',
+            tcpPort: 6005
+        };
+        const handler = new StartupAwareErrorHandler('gdscript::nc', config);
+
+        const result = handler.closed() as { action: CloseAction; message?: string };
+
+        assert.strictEqual(result.action, CloseAction.DoNotRestart);
+        assert(result.message?.includes('127.0.0.1:6005'));
+        assert(!result.message?.includes('--stdio'));
+    });
+
+    test('should wire the startup-aware error handler into client options (#58)', () => {
+        const config: LSPServerConfig = {
+            languageId: 'python',
+            command: 'pylsp',
+            fileExtensions: ['.py']
+        };
+        const handler = new StartupAwareErrorHandler('python::pylsp', config);
+        const watcher = { dispose: () => {} } as any;
+
+        const clientOptions = (lspManager as any).createClientOptions(config, watcher, handler);
+
+        assert.strictEqual(clientOptions.errorHandler, handler);
+        // A failed initialize is never retried by the library on our behalf.
+        assert.strictEqual(clientOptions.initializationFailedHandler(new Error('boom')), false);
     });
 
     test('should handle client state changes to stopped', () => {
@@ -258,7 +357,7 @@ suite('LspProxyManager Test Suite', () => {
         (lspManager as any).clients.set('rust', clientInfo);
 
         // State enum (vscode-languageclient): Stopped=1, Running=2, Starting=3.
-        (lspManager as any).handleClientStateChange('rust', { oldState: 2, newState: 1 });
+        (lspManager as any).handleClientStateChange('rust', mockLanguageClient, { oldState: 2, newState: 1 });
 
         assert.strictEqual(clientInfo.status, 'stopped');
     });
@@ -336,7 +435,7 @@ suite('LspProxyManager Test Suite', () => {
             status: 'running'
         });
 
-        (lspManager as any).handleClientStateChange('lua', { oldState: 1, newState: 2 });
+        (lspManager as any).handleClientStateChange('lua', mockLanguageClient, { oldState: 1, newState: 2 });
     });
 
     test('should not double-start when concurrent opens race (H4)', async () => {
